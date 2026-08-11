@@ -191,6 +191,11 @@ button {
   animation: marker-pop 430ms cubic-bezier(.2,1.5,.4,1) both;
 }
 
+.result-marker-shell {
+  width: 25px;
+  height: 25px;
+}
+
 .guess-marker { background: var(--ink); }
 .answer-marker { background: var(--accent); animation-delay: 180ms; }
 

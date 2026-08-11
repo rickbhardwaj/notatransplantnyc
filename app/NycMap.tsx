@@ -137,11 +137,17 @@ export function NycMap() {
     clearReveal();
 
     const guessNode = document.createElement("div");
-    guessNode.className = "result-marker guess-marker";
+    guessNode.className = "result-marker-shell";
     guessNode.setAttribute("aria-label", "Your guess");
+    const guessDot = document.createElement("div");
+    guessDot.className = "result-marker guess-marker";
+    guessNode.appendChild(guessDot);
     const answerNode = document.createElement("div");
-    answerNode.className = "result-marker answer-marker";
+    answerNode.className = "result-marker-shell";
     answerNode.setAttribute("aria-label", "Correct location");
+    const answerDot = document.createElement("div");
+    answerDot.className = "result-marker answer-marker";
+    answerNode.appendChild(answerDot);
 
     markerRefs.current = [
       new maplibregl.Marker({ element: guessNode }).setLngLat(result.guess).addTo(map),
@@ -162,10 +168,17 @@ export function NycMap() {
       source: "guess-arc",
       paint: {
         "line-color": "#e84d2a",
-        "line-width": 3,
-        "line-opacity": 0.82,
-        "line-dasharray": [1.2, 1.4],
+        "line-width": 0,
+        "line-opacity": 0,
       },
+    });
+
+    requestAnimationFrame(() => {
+      if (!map.getLayer("guess-arc")) return;
+      map.setPaintProperty("guess-arc", "line-width-transition", { duration: 700, delay: 180 });
+      map.setPaintProperty("guess-arc", "line-opacity-transition", { duration: 500, delay: 180 });
+      map.setPaintProperty("guess-arc", "line-width", 3.5);
+      map.setPaintProperty("guess-arc", "line-opacity", 0.9);
     });
 
     const bounds = new maplibregl.LngLatBounds(result.guess, result.guess).extend(result.landmark.coordinates);
@@ -296,7 +309,7 @@ export function NycMap() {
         <section className="challenge-card" aria-live="polite">
           <span className="eyebrow">Find this place</span>
           <h1>{places[round].name}</h1>
-          <p>{places[round].borough} · Press and hold your guess</p>
+          <p>Press and hold your guess</p>
         </section>
       )}
 
