@@ -158,8 +158,9 @@ export function NycMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const buzzTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const activePointersRef = useRef(new Set<number>());
+  const gestureBlockedRef = useRef(false);
   const markerRefs = useRef<maplibregl.Marker[]>([]);
   const revealResultRef = useRef<Result | null>(null);
   const [places, setPlaces] = useState<Landmark[]>([]);
@@ -193,10 +194,9 @@ export function NycMap() {
 
   const clearHold = useCallback(() => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    if (buzzTimerRef.current) clearInterval(buzzTimerRef.current);
     holdTimerRef.current = null;
-    buzzTimerRef.current = null;
     pressStartRef.current = null;
+    navigator.vibrate?.(0);
     setHoldPoint(null);
   }, []);
 
@@ -269,8 +269,8 @@ export function NycMap() {
       neighborhood: correctBoundary,
       score: scoring.score,
     };
-    navigator.vibrate?.([45, 30, 110]);
     clearHold();
+    navigator.vibrate?.([45, 30, 110]);
     setResults((current) => [...current, result]);
     setPhase("reveal");
     showReveal(result);
@@ -312,22 +312,33 @@ export function NycMap() {
   useEffect(() => {
     const container = containerRef.current;
     if (!container || phase !== "guess" || !ready || !boundaries) return;
+    const activePointers = activePointersRef.current;
     const pointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
+      activePointers.add(event.pointerId);
+
+      if (activePointers.size > 1) {
+        gestureBlockedRef.current = true;
+        clearHold();
+        return;
+      }
+
+      if (gestureBlockedRef.current) return;
       const point = { x: event.clientX, y: event.clientY };
       pressStartRef.current = point;
       setHoldPoint(point);
-      let strength = 7;
-      navigator.vibrate?.(strength);
-      buzzTimerRef.current = setInterval(() => {
-        strength = Math.min(32, strength + 5);
-        navigator.vibrate?.(strength);
-      }, 210);
+      navigator.vibrate?.([10, 170, 16, 145, 24, 120, 34, 95, 48, 70, 65, 48, 95]);
       holdTimerRef.current = setTimeout(() => commitGuess(point), HOLD_DURATION);
     };
     const pointerMove = (event: PointerEvent) => {
+      if (gestureBlockedRef.current) return;
       const start = pressStartRef.current;
       if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 14) clearHold();
+    };
+    const pointerEnd = (event: PointerEvent) => {
+      activePointers.delete(event.pointerId);
+      clearHold();
+      if (activePointers.size === 0) gestureBlockedRef.current = false;
     };
     const keyDown = (event: KeyboardEvent) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -337,17 +348,19 @@ export function NycMap() {
     };
     container.addEventListener("pointerdown", pointerDown);
     container.addEventListener("pointermove", pointerMove);
-    container.addEventListener("pointerup", clearHold);
-    container.addEventListener("pointercancel", clearHold);
-    container.addEventListener("pointerleave", clearHold);
+    container.addEventListener("pointerup", pointerEnd);
+    container.addEventListener("pointercancel", pointerEnd);
+    container.addEventListener("pointerleave", pointerEnd);
     container.addEventListener("keydown", keyDown);
     return () => {
       clearHold();
+      activePointers.clear();
+      gestureBlockedRef.current = false;
       container.removeEventListener("pointerdown", pointerDown);
       container.removeEventListener("pointermove", pointerMove);
-      container.removeEventListener("pointerup", clearHold);
-      container.removeEventListener("pointercancel", clearHold);
-      container.removeEventListener("pointerleave", clearHold);
+      container.removeEventListener("pointerup", pointerEnd);
+      container.removeEventListener("pointercancel", pointerEnd);
+      container.removeEventListener("pointerleave", pointerEnd);
       container.removeEventListener("keydown", keyDown);
     };
   }, [boundaries, clearHold, commitGuess, phase, ready]);
