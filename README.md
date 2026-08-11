@@ -1,6 +1,6 @@
-# NYC Atlas
+# Not a Transplant
 
-A mobile-first interactive map for discovering New York City's history and popular places.
+A Knicks-inspired, mobile-first landmark guessing game for proving how well you know New York City.
 
 The first version uses MapLibre GL JS with CARTO Positron tiles, keeps navigation focused on
 the five boroughs, and presents the same phone-sized canvas on desktop.

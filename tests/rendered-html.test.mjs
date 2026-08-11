@@ -10,12 +10,13 @@ async function render() {
   }, { waitUntil() {}, passThroughOnException() {} });
 }
 
-test("server-renders the NYC Atlas map shell", async () => {
+test("server-renders the Not a Transplant game shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /NYC Atlas/);
-  assert.match(html, /NYC ATLAS/);
+  assert.match(html, /Not a Transplant/);
+  assert.match(html, /NOT A/);
+  assert.match(html, /TRANSPLANT/);
   assert.doesNotMatch(html, /All boroughs|Drag and pinch/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });

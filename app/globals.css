@@ -1,9 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #16221d;
-  --paper: #f4f1e9;
-  --accent: #e84d2a;
+  --blue: #006bb6;
+  --orange: #f58426;
+  --navy: #092f50;
+  --ink: #10293d;
+  --paper: #fff8ec;
+  --accent: var(--orange);
 }
 
 * {
@@ -16,7 +19,7 @@ body {
   min-height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #d9d8d2;
+  background: #063458;
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -29,6 +32,10 @@ button {
   display: grid;
   min-height: 100dvh;
   place-items: center;
+  background-color: var(--blue);
+  background-image:
+    linear-gradient(90deg, transparent calc(50% - 1px), rgb(255 255 255 / .13) 50%, transparent calc(50% + 1px)),
+    radial-gradient(circle at 50% 50%, transparent 0 105px, rgb(255 255 255 / .13) 106px 108px, transparent 109px);
 }
 
 .phone-shell {
@@ -36,8 +43,8 @@ button {
   width: min(100vw, 430px);
   height: 100dvh;
   overflow: hidden;
-  background: #dce2df;
-  box-shadow: 0 24px 80px rgb(22 34 29 / 0.18);
+  background: #dfe7eb;
+  box-shadow: 0 28px 90px rgb(0 20 40 / 0.34);
 }
 
 .map-experience,
@@ -50,6 +57,7 @@ button {
   width: 100%;
   height: 100%;
   background: #dfe8e9;
+  filter: saturate(.78) contrast(1.05);
 }
 
 .game-header {
@@ -69,9 +77,9 @@ button {
 .challenge-card,
 .reveal-card,
 .map-status {
-  border: 1px solid rgb(22 34 29 / 0.1);
-  background: rgb(250 248 242 / 0.93);
-  box-shadow: 0 8px 28px rgb(22 34 29 / 0.13);
+  border: 2px solid rgb(255 255 255 / .76);
+  background: rgb(255 248 236 / .96);
+  box-shadow: 0 8px 0 rgb(0 45 82 / .14), 0 12px 28px rgb(0 45 82 / .18);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -79,45 +87,68 @@ button {
 .brand-lockup {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 13px 0 7px;
-  border-radius: 23px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.11em;
+  gap: 7px;
+  height: 49px;
+  padding: 0 12px 0 5px;
+  border-radius: 9px;
+  color: var(--blue);
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .035em;
+  line-height: .82;
+  transform: skew(-2deg);
 }
 
 .brand-mark {
   display: grid;
-  width: 30px;
-  height: 30px;
+  position: relative;
+  width: 37px;
+  height: 37px;
   place-items: center;
   border-radius: 50%;
-  background: var(--accent);
+  border: 2px solid white;
+  background: var(--orange);
+  box-shadow: 0 0 0 2px var(--blue);
   color: white;
-  font-family: Georgia, serif;
-  font-size: 17px;
-  font-style: italic;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 19px;
+  font-style: normal;
   letter-spacing: 0;
+}
+
+.brand-copy {
+  display: grid;
+  text-shadow: 1px 1px 0 white;
+}
+
+.brand-copy small {
+  color: var(--orange);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: .25em;
+  line-height: 1.4;
 }
 
 .round-pill {
   display: grid;
   min-width: 58px;
-  height: 44px;
+  height: 49px;
   padding: 0 13px;
   place-items: center;
-  border-radius: 23px;
-  font-size: 12px;
-  font-weight: 800;
-  background: var(--ink);
+  border-color: white;
+  border-radius: 9px;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+  background: var(--blue);
   color: white;
+  box-shadow: 0 5px 0 var(--navy), 0 10px 24px rgb(0 45 82 / .24);
 }
 
 .round-pill span {
-  color: #aab5af;
+  color: #ffb879;
 }
 
 .challenge-card {
@@ -126,15 +157,16 @@ button {
   top: max(78px, calc(env(safe-area-inset-top) + 60px));
   right: 16px;
   left: 16px;
-  padding: 17px 18px 16px;
-  border-radius: 20px;
+  padding: 16px 18px 17px;
+  border: 3px solid var(--blue);
+  border-radius: 12px;
   text-align: center;
   pointer-events: none;
   animation: card-in 420ms cubic-bezier(.2,.8,.2,1) both;
 }
 
 .eyebrow {
-  color: var(--accent);
+  color: var(--blue);
   font-size: 9px;
   font-weight: 900;
   letter-spacing: .15em;
@@ -143,14 +175,17 @@ button {
 
 .challenge-card h1 {
   margin: 5px 0 4px;
-  font-family: Georgia, "Times New Roman", serif;
+  color: var(--navy);
+  font-family: Impact, "Arial Black", sans-serif;
   font-size: clamp(22px, 6vw, 28px);
-  line-height: 1.05;
+  letter-spacing: .015em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .challenge-card p {
   margin: 0;
-  color: #69766f;
+  color: #567084;
   font-size: 11px;
 }
 
@@ -172,14 +207,14 @@ button {
 
 .hold-target span {
   border: 3px solid var(--accent);
-  background: rgb(232 77 42 / .13);
+  background: rgb(245 132 38 / .16);
   animation: charge 1.15s linear both;
 }
 
 .hold-target i {
   inset: 23px;
   background: var(--accent);
-  box-shadow: 0 2px 10px rgb(232 77 42 / .5);
+  box-shadow: 0 0 0 5px rgb(0 107 182 / .34), 0 2px 12px rgb(245 132 38 / .55);
 }
 
 .result-marker {
@@ -196,8 +231,8 @@ button {
   height: 25px;
 }
 
-.guess-marker { background: var(--ink); }
-.answer-marker { background: var(--accent); animation-delay: 180ms; }
+.guess-marker { background: var(--blue); box-shadow: 0 0 0 3px var(--navy), 0 4px 15px rgb(0 45 82 / .35); }
+.answer-marker { background: var(--orange); box-shadow: 0 0 0 3px var(--blue), 0 4px 15px rgb(0 45 82 / .35); animation-delay: 180ms; }
 
 .reveal-card {
   position: absolute;
@@ -210,7 +245,8 @@ button {
   align-items: center;
   gap: 12px;
   padding: 13px;
-  border-radius: 23px;
+  border: 3px solid var(--blue);
+  border-radius: 14px;
   animation: reveal-up 600ms 650ms cubic-bezier(.2,.8,.2,1) both;
 }
 
@@ -220,26 +256,29 @@ button {
   height: 62px;
   place-content: center;
   border-radius: 50%;
-  background: var(--accent);
+  border: 3px solid white;
+  background: var(--orange);
+  box-shadow: 0 0 0 3px var(--blue);
   color: white;
   text-align: center;
 }
 
-.score-orb strong { font-family: Georgia, serif; font-size: 26px; line-height: .85; }
+.score-orb strong { font-family: Impact, "Arial Black", sans-serif; font-size: 28px; line-height: .85; }
 .score-orb span { margin-top: 3px; font-size: 8px; font-weight: 700; opacity: .8; }
 .reveal-copy { min-width: 0; }
-.reveal-copy span { display: block; overflow: hidden; font-family: Georgia, serif; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.reveal-copy strong { display: block; margin-top: 3px; color: #67736d; font-size: 10px; }
+.reveal-copy span { display: block; overflow: hidden; color: var(--navy); font-family: Impact, "Arial Black", sans-serif; font-size: 14px; font-weight: 700; letter-spacing: .02em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.reveal-copy strong { display: block; margin-top: 3px; color: #567084; font-size: 10px; }
 .reveal-card button,
 .play-again {
   min-height: 44px;
   border: 0;
-  border-radius: 14px;
-  background: var(--ink);
+  border-radius: 8px;
+  background: var(--blue);
   color: white;
   cursor: pointer;
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 .reveal-card button { width: 72px; padding: 0 8px; }
 
@@ -250,7 +289,7 @@ button {
   display: grid;
   padding: 20px;
   place-items: center;
-  background: rgb(22 34 29 / .55);
+  background: rgb(0 45 82 / .7);
   backdrop-filter: blur(9px);
   animation: fade-in 300ms ease both;
 }
@@ -258,22 +297,23 @@ button {
 .results-modal {
   width: 100%;
   padding: 28px 22px 22px;
-  border-radius: 28px;
+  border: 4px solid var(--blue);
+  border-radius: 16px;
   background: var(--paper);
   box-shadow: 0 24px 70px rgb(0 0 0 / .28);
   animation: modal-in 500ms cubic-bezier(.2,.9,.2,1) both;
 }
 
-.results-modal h2 { margin: 7px 0 4px; font-family: Georgia, serif; font-size: 28px; }
+.results-modal h2 { margin: 7px 0 4px; color: var(--navy); font-family: Impact, "Arial Black", sans-serif; font-size: 28px; letter-spacing: .02em; text-transform: uppercase; }
 .total-score { display: flex; align-items: baseline; gap: 5px; margin-bottom: 18px; }
-.total-score strong { color: var(--accent); font-family: Georgia, serif; font-size: 42px; line-height: 1; }
+.total-score strong { color: var(--orange); font-family: Impact, "Arial Black", sans-serif; font-size: 46px; line-height: 1; text-shadow: 2px 2px 0 var(--blue); }
 .total-score span { color: #7c8781; font-size: 12px; font-weight: 700; }
 .results-modal ol { display: grid; gap: 7px; margin: 0 0 19px; padding: 0; list-style: none; }
-.results-modal li { display: grid; grid-template-columns: 42px 1fr; align-items: center; overflow: hidden; border: 1px solid rgb(22 34 29 / .09); border-radius: 13px; background: white; }
-.results-modal li > span { display: grid; height: 43px; place-items: center; background: var(--ink); color: white; font-family: Georgia, serif; font-size: 17px; font-weight: 700; }
+.results-modal li { display: grid; grid-template-columns: 42px 1fr; align-items: center; overflow: hidden; border: 2px solid rgb(0 107 182 / .18); border-radius: 8px; background: white; }
+.results-modal li > span { display: grid; height: 43px; place-items: center; background: var(--blue); color: white; font-family: Impact, "Arial Black", sans-serif; font-size: 18px; font-weight: 700; }
 .results-modal a { display: flex; min-width: 0; height: 43px; align-items: center; justify-content: space-between; padding: 0 12px; color: var(--ink); font-size: 12px; font-weight: 700; text-decoration: none; }
 .results-modal a i { color: var(--accent); font-style: normal; }
-.play-again { width: 100%; font-size: 12px; }
+.play-again { width: 100%; border-bottom: 4px solid var(--navy); font-size: 12px; }
 
 .map-status {
   position: absolute;
@@ -317,7 +357,8 @@ button {
 .maplibregl-ctrl-group {
   overflow: hidden;
   border: 1px solid rgb(22 34 29 / 0.1);
-  border-radius: 14px;
+  border: 2px solid var(--blue);
+  border-radius: 8px;
   box-shadow: 0 8px 25px rgb(22 34 29 / 0.14) !important;
 }
 
@@ -341,14 +382,16 @@ button {
   .app-stage {
     padding: 20px;
     background:
-      radial-gradient(circle at 50% 18%, rgb(255 255 255 / 0.8), transparent 34%),
-      #d9d8d2;
+      linear-gradient(90deg, transparent calc(50% - 1px), rgb(255 255 255 / .12) 50%, transparent calc(50% + 1px)),
+      radial-gradient(circle at 50% 50%, transparent 0 140px, rgb(255 255 255 / .12) 141px 143px, transparent 144px),
+      var(--blue);
   }
 
   .phone-shell {
     height: min(900px, calc(100dvh - 40px));
-    border: 8px solid #232a27;
+    border: 8px solid var(--orange);
     border-radius: 42px;
+    box-shadow: 0 0 0 7px var(--navy), 0 28px 90px rgb(0 20 40 / .45);
   }
 }
 

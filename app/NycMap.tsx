@@ -167,7 +167,7 @@ export function NycMap() {
       type: "line",
       source: "guess-arc",
       paint: {
-        "line-color": "#e84d2a",
+        "line-color": "#f58426",
         "line-width": 0,
         "line-opacity": 0,
       },
@@ -301,7 +301,10 @@ export function NycMap() {
       <div ref={containerRef} className="map-canvas" aria-label="Map of New York City" />
 
       <header className="game-header">
-        <div className="brand-lockup" aria-label="NYC Atlas"><span className="brand-mark">N</span><span>NYC ATLAS</span></div>
+        <div className="brand-lockup" aria-label="Not a Transplant">
+          <span className="brand-mark">N</span>
+          <span className="brand-copy"><small>NOT A</small> TRANSPLANT</span>
+        </div>
         <div className="round-pill">{Math.min(round + 1, 5)} <span>/ 5</span></div>
       </header>
 
