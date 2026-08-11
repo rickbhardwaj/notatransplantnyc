@@ -132,11 +132,13 @@ button {
 }
 
 .round-pill {
-  display: grid;
+  display: flex;
   min-width: 58px;
   height: 49px;
   padding: 0 13px;
-  place-items: center;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
   border-color: white;
   border-radius: 9px;
   font-family: Impact, "Arial Black", sans-serif;
@@ -147,9 +149,9 @@ button {
   box-shadow: 0 5px 0 var(--navy), 0 10px 24px rgb(0 45 82 / .24);
 }
 
-.round-pill span {
-  color: #ffb879;
-}
+.round-current { color: white; }
+.round-divider { color: #ffb879; font-size: 12px; }
+.round-total { color: #ffb879; font-size: 12px; }
 
 .challenge-card {
   position: absolute;
@@ -269,7 +271,8 @@ button {
 .reveal-copy span { display: block; overflow: hidden; color: var(--navy); font-family: Impact, "Arial Black", sans-serif; font-size: 14px; font-weight: 700; letter-spacing: .02em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .reveal-copy strong { display: block; margin-top: 3px; color: #567084; font-size: 10px; }
 .reveal-card button,
-.play-again {
+.copy-score,
+.share-score {
   min-height: 44px;
   border: 0;
   border-radius: 8px;
@@ -313,7 +316,142 @@ button {
 .results-modal li > span { display: grid; height: 43px; place-items: center; background: var(--blue); color: white; font-family: Impact, "Arial Black", sans-serif; font-size: 18px; font-weight: 700; }
 .results-modal a { display: flex; min-width: 0; height: 43px; align-items: center; justify-content: space-between; padding: 0 12px; color: var(--ink); font-size: 12px; font-weight: 700; text-decoration: none; }
 .results-modal a i { color: var(--accent); font-style: normal; }
-.play-again { width: 100%; border-bottom: 4px solid var(--navy); font-size: 12px; }
+.score-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.score-summary .total-score {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.verdict {
+  position: relative;
+  z-index: 0;
+  display: grid;
+  max-width: 140px;
+  min-width: 112px;
+  padding: 7px 9px 8px;
+  transform: perspective(100px) rotateX(-2deg) rotate(-1deg);
+  border: 3px solid white;
+  border-radius: 50% 50% 8px 8px / 22% 22% 8px 8px;
+  font-family: Impact, "Arial Black", sans-serif;
+  line-height: .88;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.verdict::before {
+  position: absolute;
+  z-index: -1;
+  right: 23%;
+  bottom: -10px;
+  left: 23%;
+  height: 15px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  background: var(--orange);
+  content: "";
+}
+
+.verdict small {
+  color: var(--orange);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: .22em;
+  line-height: 1.2;
+  text-shadow: 1px 1px 0 var(--navy);
+}
+
+.verdict strong {
+  color: white;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: .025em;
+  -webkit-text-stroke: 1px var(--navy);
+  text-shadow: 2px 2px 0 var(--orange), 3px 3px 0 var(--navy);
+}
+
+.verdict-local {
+  background: var(--blue);
+  box-shadow: 0 0 0 3px var(--orange), 4px 6px 0 var(--navy);
+}
+
+.verdict-transplant {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background: var(--orange);
+  box-shadow: 0 0 0 3px var(--blue), 4px 6px 0 var(--navy);
+}
+
+.verdict-transplant::before { background: var(--blue); }
+.verdict-transplant strong { text-shadow: 2px 2px 0 var(--blue), 3px 3px 0 var(--navy); }
+
+.share-preview-wrap {
+  margin: 0 0 12px;
+}
+
+.share-preview-wrap > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--blue);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.share-preview-wrap pre {
+  margin: 0;
+  padding: 11px 12px;
+  overflow: auto;
+  border: 2px dashed rgb(0 107 182 / .3);
+  border-radius: 8px;
+  background: white;
+  color: var(--navy);
+  font: 700 10px/1.55 Arial, Helvetica, sans-serif;
+  white-space: pre-wrap;
+}
+
+.result-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.copy-score,
+.share-score {
+  width: 100%;
+  border-bottom: 4px solid var(--navy);
+  font-size: 11px;
+}
+
+.share-score {
+  border-bottom-color: #a44f0c;
+  background: var(--orange);
+}
+
+.copy-score {
+  background: var(--blue);
+}
+
+.share-score span {
+  margin-right: 5px;
+  font-size: 15px;
+}
+
+.share-status {
+  min-height: 13px;
+  margin: 7px 0 -7px;
+  color: #567084;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
 
 .map-status {
   position: absolute;

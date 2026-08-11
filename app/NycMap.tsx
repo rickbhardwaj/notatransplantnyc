@@ -82,6 +82,15 @@ function scoreFor(distance: number) {
   return Math.max(0, Math.min(100, Math.round(100 * Math.exp(-distance / 3))));
 }
 
+function scoreEmoji(score: number) {
+  if (score >= 90) return "🗽";
+  if (score >= 80) return "🍎";
+  if (score >= 65) return "🥯";
+  if (score >= 50) return "🍕";
+  if (score >= 30) return "🐦";
+  return "🐀";
+}
+
 function arcBetween(a: [number, number], b: [number, number]) {
   const points: [number, number][] = [];
   const lift = Math.min(0.055, Math.abs(a[0] - b[0]) * 0.09 + Math.abs(a[1] - b[1]) * 0.05);
@@ -108,6 +117,7 @@ export function NycMap() {
   const [phase, setPhase] = useState<"guess" | "reveal" | "finished">("guess");
   const [ready, setReady] = useState(false);
   const [holdPoint, setHoldPoint] = useState<{ x: number; y: number } | null>(null);
+  const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
 
   useEffect(() => {
     const timer = setTimeout(() => setPlaces(randomFive()), 0);
@@ -284,17 +294,36 @@ export function NycMap() {
     mapRef.current?.fitBounds(NYC_BOUNDS, { padding: 30, duration: 850 });
   };
 
-  const playAgain = () => {
-    clearReveal();
-    setPlaces(randomFive());
-    setResults([]);
-    setRound(0);
-    setPhase("guess");
-    mapRef.current?.fitBounds(NYC_BOUNDS, { padding: 30, duration: 700 });
-  };
-
   const currentResult = results.at(-1);
   const totalScore = results.reduce((sum, result) => sum + result.score, 0);
+  const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
+  const shareDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(new Date());
+  const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
+  const shareText = `Not a Transplant — ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+
+  const shareScore = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Not a Transplant", text: shareText });
+        setShareStatus("shared");
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        setShareStatus("copied");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      await navigator.clipboard.writeText(shareText);
+      setShareStatus("copied");
+    }
+
+    window.setTimeout(() => setShareStatus("idle"), 2200);
+  };
+
+  const copyScore = async () => {
+    await navigator.clipboard.writeText(shareText);
+    setShareStatus("copied");
+    window.setTimeout(() => setShareStatus("idle"), 2200);
+  };
 
   return (
     <div className="map-experience">
@@ -305,7 +334,11 @@ export function NycMap() {
           <span className="brand-mark">N</span>
           <span className="brand-copy"><small>NOT A</small> TRANSPLANT</span>
         </div>
-        <div className="round-pill">{Math.min(round + 1, 5)} <span>/ 5</span></div>
+        <div className="round-pill" aria-label={`Round ${Math.min(round + 1, 5)} of 5`}>
+          <span className="round-current">{Math.min(round + 1, 5)}</span>
+          <span className="round-divider">/</span>
+          <span className="round-total">5</span>
+        </div>
       </header>
 
       {places[round] && phase === "guess" && (
@@ -339,8 +372,14 @@ export function NycMap() {
         <div className="results-backdrop">
           <section className="results-modal" role="dialog" aria-modal="true" aria-labelledby="results-title">
             <span className="eyebrow">Five places found</span>
-            <h2 id="results-title">Your NYC score</h2>
-            <div className="total-score"><strong>{totalScore}</strong><span>/ 500</span></div>
+            <h2 id="results-title">Your Transplant Score</h2>
+            <div className="score-summary">
+              <div className="total-score"><strong>{totalScore}</strong><span>/ 500</span></div>
+              <span className={`verdict ${totalScore >= 250 ? "verdict-local" : "verdict-transplant"}`} aria-label={verdict}>
+                {totalScore >= 250 && <small>NOT A</small>}
+                <strong>TRANSPLANT</strong>
+              </span>
+            </div>
             <ol>
               {results.map((result) => (
                 <li key={result.landmark.name}>
@@ -349,7 +388,21 @@ export function NycMap() {
                 </li>
               ))}
             </ol>
-            <button className="play-again" type="button" onClick={playAgain}>Play again</button>
+            <div className="share-preview-wrap">
+              <span>Share preview</span>
+              <pre>{shareText}</pre>
+            </div>
+            <div className="result-actions">
+              <button className="copy-score" type="button" onClick={copyScore}>
+                {shareStatus === "copied" ? "Copied!" : "Copy"}
+              </button>
+              <button className="share-score" type="button" onClick={shareScore}>
+                <span aria-hidden="true">↗</span>{shareStatus === "shared" ? "Shared!" : "Share"}
+              </button>
+            </div>
+            <p className="share-status" aria-live="polite">
+              {shareStatus === "copied" ? "Your score is ready to paste." : shareStatus === "shared" ? "Score shared." : ""}
+            </p>
           </section>
         </div>
       )}
