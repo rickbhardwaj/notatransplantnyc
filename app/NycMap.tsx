@@ -364,11 +364,11 @@ export function NycMap() {
   };
 
   const currentResult = results.at(-1);
-  const totalScore = results.length ? Math.round(results.reduce((sum, result) => sum + result.score, 0) / results.length) : 0;
-  const verdict = totalScore >= 50 ? "Not a Transplant" : "Transplant";
+  const totalScore = results.reduce((sum, result) => sum + result.score, 0);
+  const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
   const shareDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(new Date());
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
-  const shareText = `Not a Transplant — ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/100\nVerdict: ${verdict}`;
+  const shareText = `Not a Transplant — ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
 
   const shareScore = async () => {
     try {
@@ -459,9 +459,9 @@ export function NycMap() {
             <span className="eyebrow">Five places found</span>
             <h2 id="results-title">Your Transplant Score</h2>
             <div className="score-summary">
-              <div className="total-score"><strong>{totalScore}</strong><span>/ 100</span></div>
-              <span className={`verdict ${totalScore >= 50 ? "verdict-local" : "verdict-transplant"}`} aria-label={verdict}>
-                {totalScore >= 50 && <small>NOT A</small>}
+              <div className="total-score"><strong>{totalScore}</strong><span>/ 500</span></div>
+              <span className={`verdict ${totalScore >= 250 ? "verdict-local" : "verdict-transplant"}`} aria-label={verdict}>
+                {totalScore >= 250 && <small>NOT A</small>}
                 <strong>TRANSPLANT</strong>
               </span>
             </div>
