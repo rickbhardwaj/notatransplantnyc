@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { LngLatBoundsLike, Map as MapLibreMap } from "maplibre-gl";
+import type { Feature, FeatureCollection, MultiPolygon, Polygon, Position } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
+
+type BoundaryProperties = { id: string; name: string; borough: string };
+type BoundaryFeature = Feature<Polygon | MultiPolygon, BoundaryProperties>;
+type BoundaryCollection = FeatureCollection<Polygon | MultiPolygon, BoundaryProperties>;
+type OverlayPaths = { neighborhood: string; width: number; height: number };
 
 type Landmark = {
   name: string;
@@ -16,13 +22,18 @@ type Result = {
   landmark: Landmark;
   guess: [number, number];
   distanceKm: number;
+  distanceScore: number;
+  boroughBonus: number;
+  neighborhoodBonus: number;
+  neighborhoodName: string;
+  neighborhood: BoundaryFeature | null;
   score: number;
 };
 
 const LANDMARKS: Landmark[] = [
   { name: "Statue of Liberty", borough: "Manhattan", coordinates: [-74.0445, 40.6892], wikipedia: "https://en.wikipedia.org/wiki/Statue_of_Liberty" },
   { name: "Empire State Building", borough: "Manhattan", coordinates: [-73.9857, 40.7484], wikipedia: "https://en.wikipedia.org/wiki/Empire_State_Building" },
-  { name: "Brooklyn Bridge", borough: "Brooklyn", coordinates: [-73.9969, 40.7061], wikipedia: "https://en.wikipedia.org/wiki/Brooklyn_Bridge" },
+  { name: "Brooklyn Bridge", borough: "Brooklyn", coordinates: [-73.9947, 40.7034], wikipedia: "https://en.wikipedia.org/wiki/Brooklyn_Bridge" },
   { name: "Grand Central Terminal", borough: "Manhattan", coordinates: [-73.9772, 40.7527], wikipedia: "https://en.wikipedia.org/wiki/Grand_Central_Terminal" },
   { name: "Apollo Theater", borough: "Manhattan", coordinates: [-73.9500, 40.8100], wikipedia: "https://en.wikipedia.org/wiki/Apollo_Theater" },
   { name: "Stonewall Inn", borough: "Manhattan", coordinates: [-74.0021, 40.7338], wikipedia: "https://en.wikipedia.org/wiki/Stonewall_Inn" },
@@ -78,8 +89,60 @@ function distanceKm(a: [number, number], b: [number, number]) {
   return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-function scoreFor(distance: number) {
-  return Math.max(0, Math.min(100, Math.round(100 * Math.exp(-distance / 3))));
+function scoreFor(distance: number, boroughBonus: number, neighborhoodBonus: number) {
+  const distanceScore = Math.round(70 * Math.exp(-distance / 4));
+  return {
+    distanceScore,
+    score: Math.min(100, distanceScore + boroughBonus + neighborhoodBonus),
+  };
+}
+
+function pointInRing(point: [number, number], ring: Position[]) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > point[1]) !== (yj > point[1]) && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function pointInPolygon(point: [number, number], rings: Position[][]) {
+  return pointInRing(point, rings[0]) && !rings.slice(1).some((ring) => pointInRing(point, ring));
+}
+
+function containsPoint(feature: BoundaryFeature, point: [number, number]) {
+  if (feature.geometry.type === "Polygon") return pointInPolygon(point, feature.geometry.coordinates);
+  return feature.geometry.coordinates.some((polygon) => pointInPolygon(point, polygon));
+}
+
+function findBoundary(boundaries: BoundaryCollection, point: [number, number]) {
+  return boundaries.features.find((feature) => containsPoint(feature, point)) ?? null;
+}
+
+function extendBoundsWithGeometry(bounds: maplibregl.LngLatBounds, feature: BoundaryFeature) {
+  const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+  polygons.forEach((polygon) => polygon.forEach((ring) => ring.forEach((coordinate) => bounds.extend(coordinate as [number, number]))));
+}
+
+function projectedPath(map: MapLibreMap, coordinates: Position[][]) {
+  return coordinates.map((ring) => ring.map((coordinate, index) => {
+    const point = map.project(coordinate as [number, number]);
+    return `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+  }).join(" ") + " Z").join(" ");
+}
+
+function buildOverlayPaths(map: MapLibreMap, result: Result): OverlayPaths {
+  const neighborhoodPolygons = result.neighborhood
+    ? result.neighborhood.geometry.type === "Polygon"
+      ? [result.neighborhood.geometry.coordinates]
+      : result.neighborhood.geometry.coordinates
+    : [];
+  const neighborhood = neighborhoodPolygons.map((polygon) => projectedPath(map, polygon)).join(" ");
+  const container = map.getContainer();
+  return { neighborhood, width: container.clientWidth, height: container.clientHeight };
 }
 
 function scoreEmoji(score: number) {
@@ -91,19 +154,6 @@ function scoreEmoji(score: number) {
   return "🐀";
 }
 
-function arcBetween(a: [number, number], b: [number, number]) {
-  const points: [number, number][] = [];
-  const lift = Math.min(0.055, Math.abs(a[0] - b[0]) * 0.09 + Math.abs(a[1] - b[1]) * 0.05);
-  for (let i = 0; i <= 36; i += 1) {
-    const t = i / 36;
-    points.push([
-      a[0] + (b[0] - a[0]) * t,
-      a[1] + (b[1] - a[1]) * t + Math.sin(Math.PI * t) * lift,
-    ]);
-  }
-  return points;
-}
-
 export function NycMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -111,17 +161,34 @@ export function NycMap() {
   const buzzTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pressStartRef = useRef<{ x: number; y: number } | null>(null);
   const markerRefs = useRef<maplibregl.Marker[]>([]);
+  const revealResultRef = useRef<Result | null>(null);
   const [places, setPlaces] = useState<Landmark[]>([]);
   const [round, setRound] = useState(0);
   const [results, setResults] = useState<Result[]>([]);
   const [phase, setPhase] = useState<"guess" | "reveal" | "finished">("guess");
   const [ready, setReady] = useState(false);
+  const [boundaries, setBoundaries] = useState<BoundaryCollection | null>(null);
   const [holdPoint, setHoldPoint] = useState<{ x: number; y: number } | null>(null);
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
+  const [overlayPaths, setOverlayPaths] = useState<OverlayPaths>({ neighborhood: "", width: 0, height: 0 });
 
   useEffect(() => {
     const timer = setTimeout(() => setPlaces(randomFive()), 0);
-    return () => clearTimeout(timer);
+    const controller = new AbortController();
+    fetch("/data/nyc-neighborhoods.json", { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Neighborhood boundaries failed to load");
+        return response.json() as Promise<BoundaryCollection>;
+      })
+      .then(setBoundaries)
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error(error);
+      });
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, []);
 
   const clearHold = useCallback(() => {
@@ -133,18 +200,25 @@ export function NycMap() {
     setHoldPoint(null);
   }, []);
 
+  const refreshOverlay = useCallback(() => {
+    const map = mapRef.current;
+    const result = revealResultRef.current;
+    if (!map || !result) return;
+    setOverlayPaths(buildOverlayPaths(map, result));
+  }, []);
+
   const clearReveal = useCallback(() => {
     markerRefs.current.forEach((marker) => marker.remove());
     markerRefs.current = [];
-    const map = mapRef.current;
-    if (map?.getLayer("guess-arc")) map.removeLayer("guess-arc");
-    if (map?.getSource("guess-arc")) map.removeSource("guess-arc");
+    revealResultRef.current = null;
+    setOverlayPaths({ neighborhood: "", width: 0, height: 0 });
   }, []);
 
   const showReveal = useCallback((result: Result) => {
     const map = mapRef.current;
     if (!map) return;
     clearReveal();
+    revealResultRef.current = result;
 
     const guessNode = document.createElement("div");
     guessNode.className = "result-marker-shell";
@@ -164,58 +238,43 @@ export function NycMap() {
       new maplibregl.Marker({ element: answerNode }).setLngLat(result.landmark.coordinates).addTo(map),
     ];
 
-    map.addSource("guess-arc", {
-      type: "geojson",
-      data: {
-        type: "Feature",
-        properties: {},
-        geometry: { type: "LineString", coordinates: arcBetween(result.guess, result.landmark.coordinates) },
-      },
-    });
-    map.addLayer({
-      id: "guess-arc",
-      type: "line",
-      source: "guess-arc",
-      paint: {
-        "line-color": "#f58426",
-        "line-width": 0,
-        "line-opacity": 0,
-      },
-    });
-
-    requestAnimationFrame(() => {
-      if (!map.getLayer("guess-arc")) return;
-      map.setPaintProperty("guess-arc", "line-width-transition", { duration: 700, delay: 180 });
-      map.setPaintProperty("guess-arc", "line-opacity-transition", { duration: 500, delay: 180 });
-      map.setPaintProperty("guess-arc", "line-width", 3.5);
-      map.setPaintProperty("guess-arc", "line-opacity", 0.9);
-    });
-
     const bounds = new maplibregl.LngLatBounds(result.guess, result.guess).extend(result.landmark.coordinates);
+    if (result.neighborhood) extendBoundsWithGeometry(bounds, result.neighborhood);
+    refreshOverlay();
     map.fitBounds(bounds, { padding: { top: 150, right: 55, bottom: 230, left: 55 }, maxZoom: 13.5, duration: 950 });
-  }, [clearReveal]);
+  }, [clearReveal, refreshOverlay]);
 
   const commitGuess = useCallback((point: { x: number; y: number }) => {
     const map = mapRef.current;
     const landmark = places[round];
-    if (!map || !landmark || phase !== "guess") return;
+    if (!map || !landmark || !boundaries || phase !== "guess") return;
 
     const rect = containerRef.current!.getBoundingClientRect();
     const lngLat = map.unproject([point.x - rect.left, point.y - rect.top]);
     const guess: [number, number] = [lngLat.lng, lngLat.lat];
     const kilometers = distanceKm(guess, landmark.coordinates);
+    const correctBoundary = findBoundary(boundaries, landmark.coordinates);
+    const guessedBoundary = findBoundary(boundaries, guess);
+    const boroughBonus = correctBoundary && guessedBoundary?.properties.borough === correctBoundary.properties.borough ? 10 : 0;
+    const neighborhoodBonus = correctBoundary && guessedBoundary?.properties.id === correctBoundary.properties.id ? 20 : 0;
+    const scoring = scoreFor(kilometers, boroughBonus, neighborhoodBonus);
     const result: Result = {
       landmark,
       guess,
       distanceKm: kilometers,
-      score: scoreFor(kilometers),
+      distanceScore: scoring.distanceScore,
+      boroughBonus,
+      neighborhoodBonus,
+      neighborhoodName: correctBoundary?.properties.name ?? "Landmark area",
+      neighborhood: correctBoundary,
+      score: scoring.score,
     };
     navigator.vibrate?.([45, 30, 110]);
     clearHold();
     setResults((current) => [...current, result]);
     setPhase("reveal");
     showReveal(result);
-  }, [clearHold, phase, places, round, showReveal]);
+  }, [boundaries, clearHold, phase, places, round, showReveal]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -235,22 +294,24 @@ export function NycMap() {
     mapRef.current = map;
     const resizeObserver = new ResizeObserver(() => map.resize());
     resizeObserver.observe(container);
+    map.on("move", refreshOverlay);
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
     map.once("load", () => setReady(true));
 
     return () => {
       resizeObserver.disconnect();
+      map.off("move", refreshOverlay);
       clearHold();
       clearReveal();
       map.remove();
       mapRef.current = null;
     };
-  }, [clearHold, clearReveal]);
+  }, [clearHold, clearReveal, refreshOverlay]);
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || phase !== "guess" || !ready) return;
+    if (!container || phase !== "guess" || !ready || !boundaries) return;
     const pointerDown = (event: PointerEvent) => {
       if (event.button !== 0) return;
       const point = { x: event.clientX, y: event.clientY };
@@ -268,11 +329,18 @@ export function NycMap() {
       const start = pressStartRef.current;
       if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 14) clearHold();
     };
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      const rect = container.getBoundingClientRect();
+      commitGuess({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    };
     container.addEventListener("pointerdown", pointerDown);
     container.addEventListener("pointermove", pointerMove);
     container.addEventListener("pointerup", clearHold);
     container.addEventListener("pointercancel", clearHold);
     container.addEventListener("pointerleave", clearHold);
+    container.addEventListener("keydown", keyDown);
     return () => {
       clearHold();
       container.removeEventListener("pointerdown", pointerDown);
@@ -280,8 +348,9 @@ export function NycMap() {
       container.removeEventListener("pointerup", clearHold);
       container.removeEventListener("pointercancel", clearHold);
       container.removeEventListener("pointerleave", clearHold);
+      container.removeEventListener("keydown", keyDown);
     };
-  }, [clearHold, commitGuess, phase, ready]);
+  }, [boundaries, clearHold, commitGuess, phase, ready]);
 
   const nextRound = () => {
     clearReveal();
@@ -295,11 +364,11 @@ export function NycMap() {
   };
 
   const currentResult = results.at(-1);
-  const totalScore = results.reduce((sum, result) => sum + result.score, 0);
-  const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
+  const totalScore = results.length ? Math.round(results.reduce((sum, result) => sum + result.score, 0) / results.length) : 0;
+  const verdict = totalScore >= 50 ? "Not a Transplant" : "Transplant";
   const shareDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(new Date());
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
-  const shareText = `Not a Transplant — ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+  const shareText = `Not a Transplant — ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/100\nVerdict: ${verdict}`;
 
   const shareScore = async () => {
     try {
@@ -328,6 +397,17 @@ export function NycMap() {
   return (
     <div className="map-experience">
       <div ref={containerRef} className="map-canvas" aria-label="Map of New York City" />
+      {phase === "reveal" && overlayPaths.width > 0 && (
+        <svg
+          className="reveal-overlay"
+          viewBox={`0 0 ${overlayPaths.width} ${overlayPaths.height}`}
+          aria-hidden="true"
+        >
+          {overlayPaths.neighborhood && (
+            <path className="neighborhood-overlay-fill" d={overlayPaths.neighborhood} fillRule="evenodd" />
+          )}
+        </svg>
+      )}
 
       <header className="game-header">
         <div className="brand-lockup" aria-label="Not a Transplant">
@@ -355,7 +435,7 @@ export function NycMap() {
         </div>
       )}
 
-      {!ready && <div className="map-status" role="status"><span className="loading-dot" />Drawing New York</div>}
+      {(!ready || !boundaries) && <div className="map-status" role="status"><span className="loading-dot" />Drawing New York</div>}
 
       {phase === "reveal" && currentResult && (
         <section className="reveal-card" aria-live="polite">
@@ -363,6 +443,11 @@ export function NycMap() {
           <div className="reveal-copy">
             <span>{currentResult.landmark.name}</span>
             <strong>{currentResult.distanceKm < 1 ? `${Math.round(currentResult.distanceKm * 1000)} m away` : `${currentResult.distanceKm.toFixed(1)} km away`}</strong>
+            <em className="neighborhood-name">{currentResult.neighborhoodName}</em>
+            <div className="bonus-row" aria-label={`Scoring bonuses for ${currentResult.neighborhoodName}`}>
+              <span className={currentResult.neighborhoodBonus ? "bonus-earned" : "bonus-missed"}>+20 Neighborhood</span>
+              <span className={currentResult.boroughBonus ? "bonus-earned" : "bonus-missed"}>+10 Borough</span>
+            </div>
           </div>
           <button type="button" onClick={nextRound}>{round === 4 ? "See results" : "Next place"}</button>
         </section>
@@ -374,9 +459,9 @@ export function NycMap() {
             <span className="eyebrow">Five places found</span>
             <h2 id="results-title">Your Transplant Score</h2>
             <div className="score-summary">
-              <div className="total-score"><strong>{totalScore}</strong><span>/ 500</span></div>
-              <span className={`verdict ${totalScore >= 250 ? "verdict-local" : "verdict-transplant"}`} aria-label={verdict}>
-                {totalScore >= 250 && <small>NOT A</small>}
+              <div className="total-score"><strong>{totalScore}</strong><span>/ 100</span></div>
+              <span className={`verdict ${totalScore >= 50 ? "verdict-local" : "verdict-transplant"}`} aria-label={verdict}>
+                {totalScore >= 50 && <small>NOT A</small>}
                 <strong>TRANSPLANT</strong>
               </span>
             </div>
