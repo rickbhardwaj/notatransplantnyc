@@ -381,7 +381,7 @@ export function NycMap() {
   const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
   const shareDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(new Date());
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
-  const shareText = `Not a Transplant — ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+  const shareText = `notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
 
   const shareScore = async () => {
     try {
