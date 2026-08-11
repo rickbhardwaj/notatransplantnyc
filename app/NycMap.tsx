@@ -174,6 +174,11 @@ export function NycMap() {
   const [overlayPaths, setOverlayPaths] = useState<OverlayPaths>({ neighborhood: "", width: 0, height: 0 });
 
   useEffect(() => {
+    if (window.location.hostname !== "www.notatransplant.nyc") return;
+    window.location.replace(`https://notatransplant.nyc${window.location.pathname}${window.location.search}${window.location.hash}`);
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => setPlaces(randomFive()), 0);
     const controller = new AbortController();
     fetch("/data/nyc-neighborhoods.json", { signal: controller.signal })
@@ -381,7 +386,7 @@ export function NycMap() {
   const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
   const shareDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(new Date());
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
-  const shareText = `notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+  const shareText = `www.notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
 
   const shareScore = async () => {
     try {
