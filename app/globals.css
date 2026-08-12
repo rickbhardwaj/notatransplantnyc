@@ -181,12 +181,13 @@ button {
   line-height: 1;
   text-align: center;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.difficulty-very-easy { background: #168653; }
-.difficulty-easy { background: #2b9b63; }
-.difficulty-medium { background: var(--blue); }
-.difficulty-hard { background: var(--orange); }
+.difficulty-easy { background: #168653; }
+.difficulty-medium { background: #2b9b63; }
+.difficulty-hard { background: var(--blue); }
+.difficulty-walking { background: var(--orange); }
 
 .eyebrow {
   color: var(--blue);

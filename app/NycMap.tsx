@@ -5,7 +5,7 @@ import * as maplibregl from "maplibre-gl";
 import type { LngLatBoundsLike, Map as MapLibreMap } from "maplibre-gl";
 import type { Feature, FeatureCollection, MultiPolygon, Polygon, Position } from "geojson";
 import { LANDMARKS } from "./data/landmarks";
-import type { Landmark } from "./data/landmarks";
+import type { Difficulty, Landmark } from "./data/landmarks";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 type BoundaryProperties = { id: string; name: string; borough: string };
@@ -57,11 +57,15 @@ function randomFrom<T>(items: T[], count: number, random = Math.random) {
 }
 
 function dailyFive(random = Math.random) {
-  const veryEasy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "very-easy"), 1, random);
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 2, random);
-  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 1, random);
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1, random);
+  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2, random);
   const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random);
-  return [...veryEasy, ...easy, ...medium, ...hard];
+  const walking = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "walking"), 1, random);
+  return [...easy, ...medium, ...hard, ...walking];
+}
+
+function difficultyLabel(difficulty: Difficulty) {
+  return difficulty === "walking" ? "I'm Walking Here" : difficulty;
 }
 
 function newYorkDateKey() {
@@ -126,7 +130,7 @@ function parseCsv(text: string) {
 
 function placesForSchedule(csv: string, dateKey: string) {
   const [headers, ...rows] = parseCsv(csv);
-  const columns = ["q1_very_easy", "q2_easy", "q3_easy", "q4_medium", "q5_hard"]
+  const columns = ["q1_easy", "q2_medium", "q3_medium", "q4_hard", "q5_im_walking_here"]
     .map((column) => headers.indexOf(column));
   const dateColumn = headers.indexOf("date");
   const scheduledRow = rows.find((row) => row[dateColumn] === dateKey);
@@ -512,7 +516,7 @@ export function NycMap() {
       {places[round] && phase === "guess" && (
         <section className="challenge-card" aria-live="polite">
           <span className={`difficulty-banner difficulty-${places[round].difficulty}`}>
-            {places[round].difficulty.replace("-", " ")}
+            {difficultyLabel(places[round].difficulty)}
           </span>
           <span className="eyebrow">Find this place</span>
           <h1>{places[round].name}</h1>
