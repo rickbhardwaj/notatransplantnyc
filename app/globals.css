@@ -103,7 +103,7 @@ button {
   display: flex;
   align-items: center;
   height: 49px;
-  padding: 0 15px;
+  padding: 0 10px 0 13px;
   border-radius: 9px;
   color: var(--blue);
   font-family: Impact, "Arial Black", sans-serif;
@@ -112,6 +112,35 @@ button {
   letter-spacing: .035em;
   line-height: .82;
   transform: skew(-2deg);
+}
+
+.daily-banner {
+  display: flex;
+  height: 31px;
+  margin-left: 11px;
+  padding-left: 10px;
+  align-items: center;
+  gap: 4px;
+  border-left: 2px solid rgb(0 107 182 / .2);
+  color: var(--navy);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.daily-banner small {
+  color: var(--orange);
+  font-size: 6px;
+  letter-spacing: .08em;
+}
+
+.daily-banner i {
+  color: var(--blue);
+  font-style: normal;
 }
 
 .brand-copy {
@@ -448,6 +477,42 @@ button {
   margin: 0 0 12px;
 }
 
+.next-game-countdown {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  margin: -4px 0 12px;
+  padding: 9px 11px;
+  border: 2px solid rgb(0 107 182 / .18);
+  border-radius: 8px;
+  background: white;
+}
+
+.next-game-countdown span {
+  color: var(--blue);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.next-game-countdown strong {
+  grid-row: span 2;
+  color: var(--orange);
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 23px;
+  letter-spacing: .06em;
+  line-height: 1;
+  text-shadow: 1px 1px 0 var(--navy);
+}
+
+.next-game-countdown small {
+  margin-top: 3px;
+  color: #718493;
+  font-size: 7px;
+  font-weight: 700;
+}
+
 .share-preview-wrap > span {
   display: block;
   margin-bottom: 5px;
@@ -504,6 +569,30 @@ button {
   font-size: 9px;
   font-weight: 700;
   text-align: center;
+}
+
+.game-credits {
+  margin: 9px 0 -8px;
+  color: #718493;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.game-credits a {
+  display: inline;
+  height: auto;
+  padding: 0;
+  color: var(--blue);
+  font-size: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--orange);
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 375px) {
+  .daily-banner { margin-left: 7px; padding-left: 7px; font-size: 8px; }
+  .brand-lockup { padding-right: 7px; }
 }
 
 .map-status {

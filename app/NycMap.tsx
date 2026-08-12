@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { LngLatBoundsLike, Map as MapLibreMap } from "maplibre-gl";
 import type { Feature, FeatureCollection, MultiPolygon, Polygon, Position } from "geojson";
+import { DAILY_GAMES } from "./data/dailyGames";
 import { LANDMARKS } from "./data/landmarks";
 import type { Difficulty, Landmark } from "./data/landmarks";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -57,26 +58,55 @@ function randomFrom<T>(items: T[], count: number, random = Math.random) {
 }
 
 function dailyFive(random = Math.random) {
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1, random);
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 2, random);
   const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2, random);
   const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random);
-  const walking = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "walking"), 1, random);
-  return [...easy, ...medium, ...hard, ...walking];
+  return [...easy, ...medium, ...hard];
 }
 
 function difficultyLabel(difficulty: Difficulty) {
-  return difficulty === "walking" ? "I'm Walking Here" : difficulty;
+  return difficulty;
 }
 
-function newYorkDateKey() {
+function newYorkDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).formatToParts(new Date());
+  }).formatToParts(date);
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+function displayDate(dateKey: string, includeYear = false) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" } : {}),
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+function millisecondsUntilNextNewYorkDay(now = new Date()) {
+  const today = newYorkDateKey(now);
+  let low = now.getTime();
+  let high = low + 30 * 60 * 60 * 1000;
+  while (high - low > 500) {
+    const middle = Math.floor((low + high) / 2);
+    if (newYorkDateKey(new Date(middle)) === today) low = middle;
+    else high = middle;
+  }
+  return Math.max(0, high - now.getTime());
+}
+
+function countdownLabel(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
 }
 
 function seededRandom(value: string) {
@@ -94,49 +124,11 @@ function seededRandom(value: string) {
   };
 }
 
-function parseCsv(text: string) {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    if (character === '"') {
-      if (quoted && text[index + 1] === '"') {
-        cell += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === "," && !quoted) {
-      row.push(cell);
-      cell = "";
-    } else if ((character === "\n" || character === "\r") && !quoted) {
-      if (character === "\r" && text[index + 1] === "\n") index += 1;
-      row.push(cell);
-      if (row.some(Boolean)) rows.push(row);
-      row = [];
-      cell = "";
-    } else {
-      cell += character;
-    }
-  }
-  if (cell || row.length) {
-    row.push(cell);
-    rows.push(row);
-  }
-  return rows;
-}
-
-function placesForSchedule(csv: string, dateKey: string) {
-  const [headers, ...rows] = parseCsv(csv);
-  const columns = ["q1_easy", "q2_medium", "q3_medium", "q4_hard", "q5_im_walking_here"]
-    .map((column) => headers.indexOf(column));
-  const dateColumn = headers.indexOf("date");
-  const scheduledRow = rows.find((row) => row[dateColumn] === dateKey);
-  if (!scheduledRow || dateColumn < 0 || columns.some((column) => column < 0)) return null;
-  const landmarks = new Map(LANDMARKS.map((landmark) => [landmark.name, landmark]));
-  const places = columns.map((column) => landmarks.get(scheduledRow[column]));
+function placesForSchedule(dateKey: string) {
+  const scheduledIds = DAILY_GAMES[dateKey];
+  if (!scheduledIds) return null;
+  const landmarks = new Map(LANDMARKS.map((landmark) => [landmark.id, landmark]));
+  const places = scheduledIds.map((id) => landmarks.get(id));
   return places.every((place): place is Landmark => Boolean(place)) ? places : null;
 }
 
@@ -233,6 +225,8 @@ export function NycMap() {
   const [holdPoint, setHoldPoint] = useState<{ x: number; y: number } | null>(null);
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
   const [overlayPaths, setOverlayPaths] = useState<OverlayPaths>({ neighborhood: "", width: 0, height: 0 });
+  const [gameDate] = useState(() => newYorkDateKey());
+  const [nextGameIn, setNextGameIn] = useState(() => millisecondsUntilNextNewYorkDay());
 
   useEffect(() => {
     if (window.location.hostname !== "www.notatransplant.nyc") return;
@@ -241,18 +235,8 @@ export function NycMap() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const dateKey = newYorkDateKey();
-    fetch("/data/daily-games.csv", { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error("Daily game schedule failed to load");
-        return response.text();
-      })
-      .then((csv) => setPlaces(placesForSchedule(csv, dateKey) ?? dailyFive(seededRandom(dateKey))))
-      .catch((error) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        console.error(error);
-        setPlaces(dailyFive(seededRandom(dateKey)));
-      });
+    const dateKey = gameDate;
+    setPlaces(placesForSchedule(dateKey) ?? dailyFive(seededRandom(dateKey)));
     fetch("/data/nyc-neighborhoods.json", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("Neighborhood boundaries failed to load");
@@ -266,7 +250,21 @@ export function NycMap() {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [gameDate]);
+
+  useEffect(() => {
+    if (phase !== "finished") return;
+    const updateCountdown = () => {
+      if (newYorkDateKey() !== gameDate) {
+        window.location.reload();
+        return;
+      }
+      setNextGameIn(millisecondsUntilNextNewYorkDay());
+    };
+    updateCountdown();
+    const interval = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(interval);
+  }, [gameDate, phase]);
 
   const clearHold = useCallback(() => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
@@ -455,11 +453,12 @@ export function NycMap() {
   const currentResult = results.at(-1);
   const totalScore = results.reduce((sum, result) => sum + result.score, 0);
   const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
-  const shareDate = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    day: "numeric",
-    timeZone: "America/New_York",
-  }).format(new Date());
+  const scheduleDates = Object.keys(DAILY_GAMES).sort();
+  const startDate = Date.parse(`${scheduleDates[0]}T00:00:00Z`);
+  const currentDate = Date.parse(`${gameDate}T00:00:00Z`);
+  const gameNumber = Math.max(1, Math.floor((currentDate - startDate) / 86_400_000) + 1);
+  const gameDateLabel = displayDate(gameDate);
+  const shareDate = displayDate(gameDate);
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
   const shareText = `www.notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
 
@@ -505,6 +504,7 @@ export function NycMap() {
       <header className="game-header">
         <div className="brand-lockup" aria-label="Are You a Transplant?">
           <span className="brand-copy"><small>ARE YOU A</small> TRANSPLANT?</span>
+          <span className="daily-banner"><small>Date</small>{gameDateLabel}<i>·</i><small>No.</small>{gameNumber}</span>
         </div>
         <div className="round-pill" aria-label={`Round ${Math.min(round + 1, 5)} of 5`}>
           <span className="round-current">{Math.min(round + 1, 5)}</span>
@@ -568,6 +568,11 @@ export function NycMap() {
                 </li>
               ))}
             </ol>
+            <div className="next-game-countdown" aria-live="polite">
+              <span>Next game drops in</span>
+              <strong>{countdownLabel(nextGameIn)}</strong>
+              <small>Midnight New York time</small>
+            </div>
             <div className="share-preview-wrap">
               <span>Share preview</span>
               <pre>{shareText}</pre>
@@ -582,6 +587,9 @@ export function NycMap() {
             </div>
             <p className="share-status" aria-live="polite">
               {shareStatus === "copied" ? "Your score is ready to paste." : shareStatus === "shared" ? "Score shared." : ""}
+            </p>
+            <p className="game-credits">
+              Built by <a href="https://x.com/BhardwajRick" target="_blank" rel="noreferrer">Rick</a>, Inspired by <a href="https://maptap.gg/" target="_blank" rel="noreferrer">maptag.gg</a>
             </p>
           </section>
         </div>
