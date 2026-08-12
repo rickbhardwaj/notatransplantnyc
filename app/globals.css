@@ -201,6 +201,7 @@ button {
   text-transform: uppercase;
 }
 
+.difficulty-very-easy { background: #168653; }
 .difficulty-easy { background: #2b9b63; }
 .difficulty-medium { background: var(--blue); }
 .difficulty-hard { background: var(--orange); }

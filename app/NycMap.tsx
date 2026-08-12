@@ -57,16 +57,11 @@ function randomFrom<T>(items: T[], count: number) {
 }
 
 function dailyFive() {
-  const openingRounds = randomFrom(
-    LANDMARKS.filter((landmark) => landmark.difficulty !== "hard"),
-    3,
-  );
-  const openingNames = new Set(openingRounds.map((landmark) => landmark.name));
-  const closingRounds = randomFrom(
-    LANDMARKS.filter((landmark) => landmark.difficulty !== "easy" && !openingNames.has(landmark.name)),
-    2,
-  );
-  return [...openingRounds, ...closingRounds];
+  const veryEasy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "very-easy"), 1);
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1);
+  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2);
+  const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1);
+  return [...veryEasy, ...easy, ...medium, ...hard];
 }
 
 function distanceKm(a: [number, number], b: [number, number]) {
@@ -431,7 +426,9 @@ export function NycMap() {
 
       {places[round] && phase === "guess" && (
         <section className="challenge-card" aria-live="polite">
-          <span className={`difficulty-banner difficulty-${places[round].difficulty}`}>{places[round].difficulty}</span>
+          <span className={`difficulty-banner difficulty-${places[round].difficulty}`}>
+            {places[round].difficulty.replace("-", " ")}
+          </span>
           <span className="eyebrow">Find this place</span>
           <h1>{places[round].name}</h1>
           <p>Press and hold your guess</p>
