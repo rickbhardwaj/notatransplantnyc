@@ -26,7 +26,7 @@ type Result = {
 };
 
 const NYC_BOUNDS: LngLatBoundsLike = [[-74.29, 40.48], [-73.66, 40.94]];
-const NAVIGATION_BOUNDS: LngLatBoundsLike = [[-74.36, 40.43], [-73.58, 41.01]];
+const NAVIGATION_BOUNDS: LngLatBoundsLike = [[-74.55, 40.25], [-73.35, 41.25]];
 const HOLD_DURATION = 1150;
 
 const CARTO_STYLE: maplibregl.StyleSpecification = {
