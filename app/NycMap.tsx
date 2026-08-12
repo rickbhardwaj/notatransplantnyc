@@ -57,10 +57,16 @@ function randomFrom<T>(items: T[], count: number) {
 }
 
 function dailyFive() {
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1);
-  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 3);
-  const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1);
-  return [...easy, ...medium, ...hard];
+  const openingRounds = randomFrom(
+    LANDMARKS.filter((landmark) => landmark.difficulty !== "hard"),
+    3,
+  );
+  const openingNames = new Set(openingRounds.map((landmark) => landmark.name));
+  const closingRounds = randomFrom(
+    LANDMARKS.filter((landmark) => landmark.difficulty !== "easy" && !openingNames.has(landmark.name)),
+    2,
+  );
+  return [...openingRounds, ...closingRounds];
 }
 
 function distanceKm(a: [number, number], b: [number, number]) {
