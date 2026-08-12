@@ -376,7 +376,7 @@ export function NycMap() {
   const shareScore = async () => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Not a Transplant", text: shareText });
+        await navigator.share({ title: "Are You a Transplant?", text: shareText });
         setShareStatus("shared");
       } else {
         await navigator.clipboard.writeText(shareText);
@@ -413,9 +413,8 @@ export function NycMap() {
       )}
 
       <header className="game-header">
-        <div className="brand-lockup" aria-label="Not a Transplant">
-          <span className="brand-mark">N</span>
-          <span className="brand-copy"><small>NOT A</small> TRANSPLANT</span>
+        <div className="brand-lockup" aria-label="Are You a Transplant?">
+          <span className="brand-copy"><small>ARE YOU A</small> TRANSPLANT</span>
         </div>
         <div className="round-pill" aria-label={`Round ${Math.min(round + 1, 5)} of 5`}>
           <span className="round-current">{Math.min(round + 1, 5)}</span>
