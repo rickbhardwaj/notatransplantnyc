@@ -47,21 +47,93 @@ const CARTO_STYLE: maplibregl.StyleSpecification = {
   layers: [{ id: "carto-positron", type: "raster", source: "carto" }],
 };
 
-function randomFrom<T>(items: T[], count: number) {
+function randomFrom<T>(items: T[], count: number, random = Math.random) {
   const shuffled = [...items];
   for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const swapIndex = Math.floor(random() * (index + 1));
     [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
   return shuffled.slice(0, count);
 }
 
-function dailyFive() {
-  const veryEasy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "very-easy"), 1);
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1);
-  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2);
-  const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1);
+function dailyFive(random = Math.random) {
+  const veryEasy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "very-easy"), 1, random);
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1, random);
+  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2, random);
+  const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random);
   return [...veryEasy, ...easy, ...medium, ...hard];
+}
+
+function newYorkDateKey() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function seededRandom(value: string) {
+  let state = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    state ^= value.charCodeAt(index);
+    state = Math.imul(state, 16777619);
+  }
+  return () => {
+    state += 0x6d2b79f5;
+    let result = state;
+    result = Math.imul(result ^ (result >>> 15), result | 1);
+    result ^= result + Math.imul(result ^ (result >>> 7), result | 61);
+    return ((result ^ (result >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function parseCsv(text: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"') {
+      if (quoted && text[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell);
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += character;
+    }
+  }
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function placesForSchedule(csv: string, dateKey: string) {
+  const [headers, ...rows] = parseCsv(csv);
+  const columns = ["q1_very_easy", "q2_easy", "q3_medium", "q4_medium", "q5_hard"]
+    .map((column) => headers.indexOf(column));
+  const dateColumn = headers.indexOf("date");
+  const scheduledRow = rows.find((row) => row[dateColumn] === dateKey);
+  if (!scheduledRow || dateColumn < 0 || columns.some((column) => column < 0)) return null;
+  const landmarks = new Map(LANDMARKS.map((landmark) => [landmark.name, landmark]));
+  const places = columns.map((column) => landmarks.get(scheduledRow[column]));
+  return places.every((place): place is Landmark => Boolean(place)) ? places : null;
 }
 
 function distanceKm(a: [number, number], b: [number, number]) {
@@ -164,8 +236,19 @@ export function NycMap() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setPlaces(dailyFive()), 0);
     const controller = new AbortController();
+    const dateKey = newYorkDateKey();
+    fetch("/data/daily-games.csv", { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("Daily game schedule failed to load");
+        return response.text();
+      })
+      .then((csv) => setPlaces(placesForSchedule(csv, dateKey) ?? dailyFive(seededRandom(dateKey))))
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error(error);
+        setPlaces(dailyFive(seededRandom(dateKey)));
+      });
     fetch("/data/nyc-neighborhoods.json", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("Neighborhood boundaries failed to load");
@@ -177,7 +260,6 @@ export function NycMap() {
         console.error(error);
       });
     return () => {
-      clearTimeout(timer);
       controller.abort();
     };
   }, []);
@@ -369,7 +451,11 @@ export function NycMap() {
   const currentResult = results.at(-1);
   const totalScore = results.reduce((sum, result) => sum + result.score, 0);
   const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
-  const shareDate = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" }).format(new Date());
+  const shareDate = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    timeZone: "America/New_York",
+  }).format(new Date());
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
   const shareText = `www.notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
 
