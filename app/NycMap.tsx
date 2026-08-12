@@ -4,19 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { LngLatBoundsLike, Map as MapLibreMap } from "maplibre-gl";
 import type { Feature, FeatureCollection, MultiPolygon, Polygon, Position } from "geojson";
+import { LANDMARKS } from "./data/landmarks";
+import type { Landmark } from "./data/landmarks";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 type BoundaryProperties = { id: string; name: string; borough: string };
 type BoundaryFeature = Feature<Polygon | MultiPolygon, BoundaryProperties>;
 type BoundaryCollection = FeatureCollection<Polygon | MultiPolygon, BoundaryProperties>;
 type OverlayPaths = { neighborhood: string; width: number; height: number };
-
-type Landmark = {
-  name: string;
-  borough: string;
-  coordinates: [number, number];
-  wikipedia: string;
-};
 
 type Result = {
   landmark: Landmark;
@@ -29,29 +24,6 @@ type Result = {
   neighborhood: BoundaryFeature | null;
   score: number;
 };
-
-const LANDMARKS: Landmark[] = [
-  { name: "Statue of Liberty", borough: "Manhattan", coordinates: [-74.0445, 40.6892], wikipedia: "https://en.wikipedia.org/wiki/Statue_of_Liberty" },
-  { name: "Empire State Building", borough: "Manhattan", coordinates: [-73.9857, 40.7484], wikipedia: "https://en.wikipedia.org/wiki/Empire_State_Building" },
-  { name: "Brooklyn Bridge", borough: "Brooklyn", coordinates: [-73.9947, 40.7034], wikipedia: "https://en.wikipedia.org/wiki/Brooklyn_Bridge" },
-  { name: "Grand Central Terminal", borough: "Manhattan", coordinates: [-73.9772, 40.7527], wikipedia: "https://en.wikipedia.org/wiki/Grand_Central_Terminal" },
-  { name: "Apollo Theater", borough: "Manhattan", coordinates: [-73.9500, 40.8100], wikipedia: "https://en.wikipedia.org/wiki/Apollo_Theater" },
-  { name: "Stonewall Inn", borough: "Manhattan", coordinates: [-74.0021, 40.7338], wikipedia: "https://en.wikipedia.org/wiki/Stonewall_Inn" },
-  { name: "Federal Hall", borough: "Manhattan", coordinates: [-74.0101, 40.7074], wikipedia: "https://en.wikipedia.org/wiki/Federal_Hall" },
-  { name: "Flatiron Building", borough: "Manhattan", coordinates: [-73.9897, 40.7411], wikipedia: "https://en.wikipedia.org/wiki/Flatiron_Building" },
-  { name: "Coney Island Cyclone", borough: "Brooklyn", coordinates: [-73.9707, 40.5740], wikipedia: "https://en.wikipedia.org/wiki/Coney_Island_Cyclone" },
-  { name: "Historic Richmond Town", borough: "Staten Island", coordinates: [-74.1358, 40.5709], wikipedia: "https://en.wikipedia.org/wiki/Historic_Richmond_Town" },
-  { name: "Edgar Allan Poe Cottage", borough: "The Bronx", coordinates: [-73.8941, 40.8656], wikipedia: "https://en.wikipedia.org/wiki/Edgar_Allan_Poe_Cottage" },
-  { name: "Louis Armstrong House", borough: "Queens", coordinates: [-73.8619, 40.7556], wikipedia: "https://en.wikipedia.org/wiki/Louis_Armstrong_House" },
-  { name: "Unisphere", borough: "Queens", coordinates: [-73.8456, 40.7464], wikipedia: "https://en.wikipedia.org/wiki/Unisphere" },
-  { name: "Weeksville Heritage Center", borough: "Brooklyn", coordinates: [-73.9308, 40.6744], wikipedia: "https://en.wikipedia.org/wiki/Weeksville_Heritage_Center" },
-  { name: "Wyckoff House", borough: "Brooklyn", coordinates: [-73.9208, 40.6441], wikipedia: "https://en.wikipedia.org/wiki/Wyckoff_House" },
-  { name: "Grant's Tomb", borough: "Manhattan", coordinates: [-73.9631, 40.8134], wikipedia: "https://en.wikipedia.org/wiki/Grant%27s_Tomb" },
-  { name: "Morris–Jumel Mansion", borough: "Manhattan", coordinates: [-73.9384, 40.8346], wikipedia: "https://en.wikipedia.org/wiki/Morris%E2%80%93Jumel_Mansion" },
-  { name: "Fraunces Tavern", borough: "Manhattan", coordinates: [-74.0113, 40.7034], wikipedia: "https://en.wikipedia.org/wiki/Fraunces_Tavern" },
-  { name: "African Burial Ground", borough: "Manhattan", coordinates: [-74.0047, 40.7144], wikipedia: "https://en.wikipedia.org/wiki/African_Burial_Ground_National_Monument" },
-  { name: "New York Botanical Garden", borough: "The Bronx", coordinates: [-73.8783, 40.8623], wikipedia: "https://en.wikipedia.org/wiki/New_York_Botanical_Garden" },
-];
 
 const NYC_BOUNDS: LngLatBoundsLike = [[-74.29, 40.48], [-73.66, 40.94]];
 const NAVIGATION_BOUNDS: LngLatBoundsLike = [[-74.36, 40.43], [-73.58, 41.01]];
@@ -75,8 +47,20 @@ const CARTO_STYLE: maplibregl.StyleSpecification = {
   layers: [{ id: "carto-positron", type: "raster", source: "carto" }],
 };
 
-function randomFive() {
-  return [...LANDMARKS].sort(() => Math.random() - 0.5).slice(0, 5);
+function randomFrom<T>(items: T[], count: number) {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled.slice(0, count);
+}
+
+function dailyFive() {
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1);
+  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 3);
+  const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1);
+  return [...easy, ...medium, ...hard];
 }
 
 function distanceKm(a: [number, number], b: [number, number]) {
@@ -179,7 +163,7 @@ export function NycMap() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setPlaces(randomFive()), 0);
+    const timer = setTimeout(() => setPlaces(dailyFive()), 0);
     const controller = new AbortController();
     fetch("/data/nyc-neighborhoods.json", { signal: controller.signal })
       .then((response) => {
@@ -441,6 +425,7 @@ export function NycMap() {
 
       {places[round] && phase === "guess" && (
         <section className="challenge-card" aria-live="polite">
+          <span className={`difficulty-banner difficulty-${places[round].difficulty}`}>{places[round].difficulty}</span>
           <span className="eyebrow">Find this place</span>
           <h1>{places[round].name}</h1>
           <p>Press and hold your guess</p>

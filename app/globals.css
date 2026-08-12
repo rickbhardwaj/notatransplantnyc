@@ -182,6 +182,29 @@ button {
   animation: card-in 420ms cubic-bezier(.2,.8,.2,1) both;
 }
 
+.difficulty-banner {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  min-width: 68px;
+  padding: 5px 13px 4px;
+  transform: translateX(-50%) rotate(-1deg);
+  border: 2px solid white;
+  border-radius: 999px;
+  box-shadow: 0 2px 0 var(--navy);
+  color: white;
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 10px;
+  letter-spacing: .12em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.difficulty-easy { background: #2b9b63; }
+.difficulty-medium { background: var(--blue); }
+.difficulty-hard { background: var(--orange); }
+
 .eyebrow {
   color: var(--blue);
   font-size: 9px;
