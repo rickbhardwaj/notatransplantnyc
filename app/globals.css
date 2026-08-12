@@ -294,13 +294,18 @@ button {
   bottom: max(22px, calc(env(safe-area-inset-bottom) + 12px));
   left: 16px;
   display: grid;
-  grid-template-columns: 62px 1fr auto;
-  align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 13px;
   border: 3px solid var(--blue);
   border-radius: 14px;
   animation: reveal-up 600ms 650ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.reveal-score-row {
+  display: grid;
+  grid-template-columns: 62px 1fr auto;
+  align-items: center;
+  gap: 12px;
 }
 
 .score-orb {
@@ -366,6 +371,80 @@ button {
   text-transform: uppercase;
 }
 .reveal-card button { width: 72px; padding: 0 8px; }
+
+.wikipedia-preview {
+  display: grid;
+  grid-template-columns: 76px 1fr 14px;
+  min-width: 0;
+  overflow: hidden;
+  border: 2px solid rgb(0 107 182 / .18);
+  border-radius: 9px;
+  background: white;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.wikipedia-preview img {
+  width: 76px;
+  height: 72px;
+  object-fit: cover;
+  background: var(--blue);
+}
+
+.wikipedia-preview > span {
+  min-width: 0;
+  padding: 7px 8px;
+}
+
+.wikipedia-preview small {
+  display: block;
+  color: var(--orange);
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.wikipedia-preview strong {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--navy);
+  font-family: Impact, "Arial Black", sans-serif;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wikipedia-preview p {
+  display: -webkit-box;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: #567084;
+  font-size: 8px;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.wikipedia-preview > i {
+  align-self: center;
+  color: var(--orange);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.wikipedia-loading {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #567084;
+  font-size: 9px;
+  font-weight: 800;
+}
 
 .results-backdrop {
   position: absolute;

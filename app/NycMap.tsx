@@ -13,6 +13,7 @@ type BoundaryProperties = { id: string; name: string; borough: string };
 type BoundaryFeature = Feature<Polygon | MultiPolygon, BoundaryProperties>;
 type BoundaryCollection = FeatureCollection<Polygon | MultiPolygon, BoundaryProperties>;
 type OverlayPaths = { neighborhood: string; width: number; height: number };
+type WikipediaPreview = { title: string; extract: string; image: string; url: string };
 
 type Result = {
   landmark: Landmark;
@@ -207,6 +208,43 @@ function scoreEmoji(score: number) {
   return "🐀";
 }
 
+async function loadWikipediaPreview(landmark: Landmark, signal: AbortSignal): Promise<WikipediaPreview | null> {
+  const wikiUrl = new URL(landmark.wikipedia);
+  const isSearchUrl = wikiUrl.pathname.includes("/wiki/Special:Search");
+  const params = new URLSearchParams({
+    action: "query",
+    format: "json",
+    origin: "*",
+    prop: "extracts|pageimages|info",
+    exintro: "1",
+    explaintext: "1",
+    exsentences: "2",
+    piprop: "thumbnail",
+    pithumbsize: "360",
+    inprop: "url",
+  });
+  if (isSearchUrl) {
+    params.set("generator", "search");
+    params.set("gsrsearch", `${landmark.name} New York City`);
+    params.set("gsrlimit", "1");
+  } else {
+    params.set("titles", decodeURIComponent(wikiUrl.pathname.replace("/wiki/", "")).replaceAll("_", " "));
+  }
+  const response = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, { signal });
+  if (!response.ok) throw new Error("Wikipedia preview failed to load");
+  const data = await response.json() as {
+    query?: { pages?: Record<string, { title?: string; extract?: string; fullurl?: string; thumbnail?: { source?: string } }> };
+  };
+  const page = Object.values(data.query?.pages ?? {})[0];
+  if (!page?.title) return null;
+  return {
+    title: page.title,
+    extract: page.extract ?? "Explore the history of this New York City place on Wikipedia.",
+    image: page.thumbnail?.source ?? "/nyc-wikipedia-placeholder.svg",
+    url: page.fullurl ?? landmark.wikipedia,
+  };
+}
+
 export function NycMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -227,6 +265,8 @@ export function NycMap() {
   const [overlayPaths, setOverlayPaths] = useState<OverlayPaths>({ neighborhood: "", width: 0, height: 0 });
   const [gameDate] = useState(() => newYorkDateKey());
   const [nextGameIn, setNextGameIn] = useState(() => millisecondsUntilNextNewYorkDay());
+  const [wikipediaPreviews, setWikipediaPreviews] = useState<Record<string, WikipediaPreview | null>>({});
+  const [wikipediaLoading, setWikipediaLoading] = useState(false);
 
   useEffect(() => {
     if (window.location.hostname !== "www.notatransplant.nyc") return;
@@ -265,6 +305,22 @@ export function NycMap() {
     const interval = window.setInterval(updateCountdown, 1000);
     return () => window.clearInterval(interval);
   }, [gameDate, phase]);
+
+  useEffect(() => {
+    const landmark = phase === "reveal" ? results.at(-1)?.landmark : null;
+    if (!landmark || landmark.id in wikipediaPreviews) return;
+    const controller = new AbortController();
+    setWikipediaLoading(true);
+    loadWikipediaPreview(landmark, controller.signal)
+      .then((preview) => setWikipediaPreviews((current) => ({ ...current, [landmark.id]: preview })))
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        console.error(error);
+        setWikipediaPreviews((current) => ({ ...current, [landmark.id]: null }));
+      })
+      .finally(() => setWikipediaLoading(false));
+    return () => controller.abort();
+  }, [phase, results, wikipediaPreviews]);
 
   const clearHold = useCallback(() => {
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
@@ -534,17 +590,31 @@ export function NycMap() {
 
       {phase === "reveal" && currentResult && (
         <section className="reveal-card" aria-live="polite">
-          <div className="score-orb"><strong>{currentResult.score}</strong><span>/ 100</span></div>
-          <div className="reveal-copy">
-            <span>{currentResult.landmark.name}</span>
-            <strong>{currentResult.distanceKm < 1 ? `${Math.round(currentResult.distanceKm * 1000)} m away` : `${currentResult.distanceKm.toFixed(1)} km away`}</strong>
-            <em className="neighborhood-name">{currentResult.neighborhoodName}</em>
-            <div className="bonus-row" aria-label={`Scoring bonuses for ${currentResult.neighborhoodName}`}>
-              <span className={currentResult.neighborhoodBonus ? "bonus-earned" : "bonus-missed"}>+20 Neighborhood</span>
-              <span className={currentResult.boroughBonus ? "bonus-earned" : "bonus-missed"}>+10 Borough</span>
+          <div className="reveal-score-row">
+            <div className="score-orb"><strong>{currentResult.score}</strong><span>/ 100</span></div>
+            <div className="reveal-copy">
+              <span>{currentResult.landmark.name}</span>
+              <strong>{currentResult.distanceKm < 1 ? `${Math.round(currentResult.distanceKm * 1000)} m away` : `${currentResult.distanceKm.toFixed(1)} km away`}</strong>
+              <em className="neighborhood-name">{currentResult.neighborhoodName}</em>
+              <div className="bonus-row" aria-label={`Scoring bonuses for ${currentResult.neighborhoodName}`}>
+                <span className={currentResult.neighborhoodBonus ? "bonus-earned" : "bonus-missed"}>+20 Neighborhood</span>
+                <span className={currentResult.boroughBonus ? "bonus-earned" : "bonus-missed"}>+10 Borough</span>
+              </div>
             </div>
+            <button type="button" onClick={nextRound}>{round === 4 ? "See results" : "Next place"}</button>
           </div>
-          <button type="button" onClick={nextRound}>{round === 4 ? "See results" : "Next place"}</button>
+          {wikipediaLoading && <div className="wikipedia-preview wikipedia-loading"><span className="loading-dot" />Finding its story…</div>}
+          {!wikipediaLoading && wikipediaPreviews[currentResult.landmark.id] && (
+            <a className="wikipedia-preview" href={wikipediaPreviews[currentResult.landmark.id]!.url} target="_blank" rel="noreferrer">
+              <img src={wikipediaPreviews[currentResult.landmark.id]!.image} alt="" />
+              <span>
+                <small>From Wikipedia</small>
+                <strong>{wikipediaPreviews[currentResult.landmark.id]!.title}</strong>
+                <p>{wikipediaPreviews[currentResult.landmark.id]!.extract}</p>
+              </span>
+              <i aria-hidden="true">↗</i>
+            </a>
+          )}
         </section>
       )}
 

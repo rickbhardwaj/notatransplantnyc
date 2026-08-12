@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 240" role="img" aria-label="New York City skyline">
+  <rect width="360" height="240" fill="#006bb6"/>
+  <circle cx="292" cy="55" r="27" fill="#f58426"/>
+  <path fill="#fff8ec" d="M0 197h360v43H0zm18-61h42v61H18zm50-39h45v100H68zm56 62h38v38h-38zm49-94h52v132h-52zm64 54h39v78h-39zm50-31h55v109h-55z"/>
+  <path fill="#092f50" d="M187 36h24v29h-24zm7-22h10v22h-10zM0 197h360v10H0z"/>
+</svg>

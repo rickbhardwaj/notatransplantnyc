@@ -2,13 +2,13 @@
 export type DailyLocationIds = readonly [string, string, string, string, string];
 
 export const DAILY_GAMES: Readonly<Record<string, DailyLocationIds>> = {
-  "2026-08-12": ["loc-0385", "loc-0421", "loc-0452", "loc-0248", "loc-0162"],
+  "2026-08-12": ["loc-0385", "loc-0421", "loc-0469", "loc-0248", "loc-0162"],
   "2026-08-13": ["loc-0268", "loc-0035", "loc-0433", "loc-0251", "loc-0237"],
   "2026-08-14": ["loc-0262", "loc-0477", "loc-0132", "loc-0127", "loc-0234"],
   "2026-08-15": ["loc-0264", "loc-0411", "loc-0121", "loc-0087", "loc-0242"],
   "2026-08-16": ["loc-0440", "loc-0100", "loc-0289", "loc-0019", "loc-0183"],
   "2026-08-17": ["loc-0021", "loc-0417", "loc-0339", "loc-0376", "loc-0227"],
-  "2026-08-18": ["loc-0399", "loc-0338", "loc-0469", "loc-0319", "loc-0065"],
+  "2026-08-18": ["loc-0399", "loc-0338", "loc-0452", "loc-0319", "loc-0065"],
   "2026-08-19": ["loc-0099", "loc-0323", "loc-0491", "loc-0041", "loc-0240"],
   "2026-08-20": ["loc-0106", "loc-0030", "loc-0414", "loc-0392", "loc-0223"],
   "2026-08-21": ["loc-0074", "loc-0439", "loc-0295", "loc-0435", "loc-0286"],
