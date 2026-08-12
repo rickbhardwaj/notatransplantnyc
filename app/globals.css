@@ -130,25 +130,25 @@ button {
 
 .round-pill {
   display: flex;
-  min-width: 58px;
+  min-width: 64px;
   height: 49px;
-  padding: 0 13px;
-  align-items: baseline;
+  padding: 0 8px;
+  align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 2px;
   border-color: white;
   border-radius: 9px;
   font-family: Impact, "Arial Black", sans-serif;
-  font-size: 17px;
+  font-size: 28px;
   font-weight: 900;
   background: var(--blue);
   color: white;
   box-shadow: 0 5px 0 var(--navy), 0 10px 24px rgb(0 45 82 / .24);
 }
 
-.round-current { color: white; }
-.round-divider { color: #ffb879; font-size: 12px; }
-.round-total { color: #ffb879; font-size: 12px; }
+.round-current { color: white; line-height: 1; }
+.round-divider { color: #ffb879; font-size: 18px; line-height: 1; }
+.round-total { color: #ffb879; font-size: 18px; line-height: 1; }
 
 .challenge-card {
   position: absolute;
