@@ -58,8 +58,8 @@ function randomFrom<T>(items: T[], count: number, random = Math.random) {
 
 function dailyFive(random = Math.random) {
   const veryEasy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "very-easy"), 1, random);
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 1, random);
-  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2, random);
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 2, random);
+  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 1, random);
   const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random);
   return [...veryEasy, ...easy, ...medium, ...hard];
 }
@@ -126,7 +126,7 @@ function parseCsv(text: string) {
 
 function placesForSchedule(csv: string, dateKey: string) {
   const [headers, ...rows] = parseCsv(csv);
-  const columns = ["q1_very_easy", "q2_easy", "q3_medium", "q4_medium", "q5_hard"]
+  const columns = ["q1_very_easy", "q2_easy", "q3_easy", "q4_medium", "q5_hard"]
     .map((column) => headers.indexOf(column));
   const dateColumn = headers.indexOf("date");
   const scheduledRow = rows.find((row) => row[dateColumn] === dateKey);
