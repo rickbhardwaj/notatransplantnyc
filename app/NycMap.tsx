@@ -17,6 +17,7 @@ type WikipediaPreview = { title: string; extract: string; image: string; url: st
 type GamePhase = "guess" | "reveal" | "finished";
 type SavedResult = Omit<Result, "landmark" | "neighborhood"> & { landmarkId: string };
 type SavedProgress = { version: 1; date: string; round: number; phase: GamePhase; results: SavedResult[] };
+type NycMapProps = { requestedDate?: string };
 
 type Result = {
   landmark: Landmark;
@@ -177,6 +178,18 @@ function restoreResults(saved: SavedProgress, places: Landmark[]): Result[] {
   }));
 }
 
+function savedScoreFor(dateKey: string) {
+  try {
+    const raw = window.localStorage.getItem(`${PROGRESS_KEY_PREFIX}${dateKey}`);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<SavedProgress>;
+    if (saved.version !== 1 || saved.date !== dateKey || saved.results?.length !== 5) return null;
+    return saved.results.reduce((sum, result) => sum + (typeof result.score === "number" ? result.score : 0), 0);
+  } catch {
+    return null;
+  }
+}
+
 function distanceKm(a: [number, number], b: [number, number]) {
   const toRad = (value: number) => value * Math.PI / 180;
   const lat1 = toRad(a[1]);
@@ -289,7 +302,7 @@ async function loadWikipediaPreview(landmark: Landmark, signal: AbortSignal): Pr
   };
 }
 
-export function NycMap() {
+export function NycMap({ requestedDate }: NycMapProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -307,10 +320,18 @@ export function NycMap() {
   const [holdPoint, setHoldPoint] = useState<{ x: number; y: number } | null>(null);
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
   const [overlayPaths, setOverlayPaths] = useState<OverlayPaths>({ neighborhood: "", width: 0, height: 0 });
-  const [gameDate] = useState(() => newYorkDateKey());
+  const [todayDate] = useState(() => newYorkDateKey());
+  const gameDate = requestedDate ?? todayDate;
+  const isArchive = Boolean(requestedDate && requestedDate !== todayDate);
+  const validDateFormat = /^\d{4}-\d{2}-\d{2}$/.test(gameDate);
+  const archiveIsFuture = Boolean(requestedDate && validDateFormat && requestedDate > todayDate);
+  const archiveExists = Boolean(DAILY_GAMES[gameDate]);
+  const canPlay = !requestedDate || (validDateFormat && archiveExists && requestedDate < todayDate);
   const [nextGameIn, setNextGameIn] = useState(() => millisecondsUntilNextNewYorkDay());
   const [wikipediaPreviews, setWikipediaPreviews] = useState<Record<string, WikipediaPreview | null>>({});
   const [wikipediaLoading, setWikipediaLoading] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveScores, setArchiveScores] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
     if (window.location.hostname !== "www.notatransplant.nyc") return;
@@ -318,9 +339,15 @@ export function NycMap() {
   }, []);
 
   useEffect(() => {
+    if (requestedDate !== todayDate) return;
+    window.location.replace("/");
+  }, [requestedDate, todayDate]);
+
+  useEffect(() => {
+    if (!canPlay) return;
     const controller = new AbortController();
     const dateKey = gameDate;
-    const dailyPlaces = placesForSchedule(dateKey) ?? dailyFive(seededRandom(dateKey));
+    const dailyPlaces = placesForSchedule(dateKey) ?? (requestedDate ? [] : dailyFive(seededRandom(dateKey)));
     setPlaces(dailyPlaces);
     const saved = savedProgressFor(dateKey, dailyPlaces);
     if (saved) {
@@ -341,10 +368,10 @@ export function NycMap() {
     return () => {
       controller.abort();
     };
-  }, [gameDate]);
+  }, [canPlay, gameDate, requestedDate]);
 
   useEffect(() => {
-    if (phase !== "finished") return;
+    if (phase !== "finished" || isArchive) return;
     const updateCountdown = () => {
       if (newYorkDateKey() !== gameDate) {
         window.location.reload();
@@ -355,7 +382,13 @@ export function NycMap() {
     updateCountdown();
     const interval = window.setInterval(updateCountdown, 1000);
     return () => window.clearInterval(interval);
-  }, [gameDate, phase]);
+  }, [gameDate, isArchive, phase]);
+
+  useEffect(() => {
+    if (phase !== "finished") return;
+    const pastDates = Object.keys(DAILY_GAMES).filter((date) => date < todayDate);
+    setArchiveScores(Object.fromEntries(pastDates.map((date) => [date, savedScoreFor(date)])));
+  }, [phase, todayDate]);
 
   useEffect(() => {
     const landmark = phase === "reveal" ? results.at(-1)?.landmark : null;
@@ -473,7 +506,7 @@ export function NycMap() {
   }, [boundaries, clearHold, gameDate, phase, places, results, round, showReveal]);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!canPlay || !containerRef.current || mapRef.current) return;
     const container = containerRef.current;
     const map = new maplibregl.Map({
       container,
@@ -503,7 +536,7 @@ export function NycMap() {
       map.remove();
       mapRef.current = null;
     };
-  }, [clearHold, clearReveal, refreshOverlay]);
+  }, [canPlay, clearHold, clearReveal, refreshOverlay]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -581,11 +614,17 @@ export function NycMap() {
   const scheduleDates = Object.keys(DAILY_GAMES).sort();
   const startDate = Date.parse(`${scheduleDates[0]}T00:00:00Z`);
   const currentDate = Date.parse(`${gameDate}T00:00:00Z`);
-  const gameNumber = Math.max(1, Math.floor((currentDate - startDate) / 86_400_000) + 1);
+  const scheduledIndex = scheduleDates.indexOf(gameDate);
+  const gameNumber = scheduledIndex >= 0 ? scheduledIndex + 1 : Math.max(1, Math.floor((currentDate - startDate) / 86_400_000) + 1);
   const gameDateLabel = displayDate(gameDate);
   const shareDate = displayDate(gameDate).replace(/^([A-Za-z]{3})[a-z]+/, "$1");
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
-  const shareText = `www.notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+  const shareText = `www.notatransplant.nyc ${shareDate} #${gameNumber}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+  const pastDates = scheduleDates.filter((date) => date < todayDate);
+  const latestPastDate = pastDates.at(-1);
+  const archiveIndex = pastDates.indexOf(gameDate);
+  const previousArchiveDate = archiveIndex > 0 ? pastDates[archiveIndex - 1] : null;
+  const nextArchiveDate = archiveIndex >= 0 && archiveIndex < pastDates.length - 1 ? pastDates[archiveIndex + 1] : null;
 
   const shareScore = async () => {
     try {
@@ -611,6 +650,21 @@ export function NycMap() {
     window.setTimeout(() => setShareStatus("idle"), 2200);
   };
 
+  if (requestedDate && requestedDate === todayDate) {
+    return <div className="archive-route-status" role="status"><span className="loading-dot" />Opening today’s game…</div>;
+  }
+
+  if (!canPlay) {
+    return (
+      <div className="archive-route-status">
+        <span className="archive-status-tag">Archive</span>
+        <h1>{archiveIsFuture ? "This game hasn’t dropped yet" : "Game not available"}</h1>
+        <p>{archiveIsFuture ? "Come back after it unlocks at midnight New York time." : "That date isn’t in the Not a Transplant archive."}</p>
+        <a href="/">Play today’s game</a>
+      </div>
+    );
+  }
+
   return (
     <div className="map-experience">
       <div ref={containerRef} className="map-canvas" aria-label="Map of New York City" />
@@ -629,7 +683,7 @@ export function NycMap() {
       <header className="game-header">
         <div className="brand-lockup" aria-label="Are You a Transplant?">
           <span className="brand-copy"><small>ARE YOU A</small> TRANSPLANT?</span>
-          <span className="daily-banner"><small>Date</small>{gameDateLabel}<i>·</i><small>No.</small>{gameNumber}</span>
+          <span className="daily-banner">{isArchive && <b>Archive</b>}<small>Date</small>{gameDateLabel}<i>·</i><small>No.</small>{gameNumber}</span>
         </div>
         <div className="round-pill" aria-label={`Round ${Math.min(round + 1, 5)} of 5`}>
           <span className="round-current">{Math.min(round + 1, 5)}</span>
@@ -707,11 +761,35 @@ export function NycMap() {
                 </li>
               ))}
             </ol>
-            <div className="next-game-countdown" aria-live="polite">
-              <span>Next game drops in</span>
-              <strong>{countdownLabel(nextGameIn)}</strong>
-              <small>Midnight New York time</small>
-            </div>
+            {isArchive ? (
+              <div className="archive-navigation">
+                <a className={previousArchiveDate ? "" : "archive-link-disabled"} href={previousArchiveDate ? `/game/${previousArchiveDate}` : undefined}>← Previous</a>
+                <a className="archive-today-link" href="/">Play today</a>
+                <a className={nextArchiveDate ? "" : "archive-link-disabled"} href={nextArchiveDate ? `/game/${nextArchiveDate}` : undefined}>Next →</a>
+              </div>
+            ) : (
+              <div className="next-game-countdown" aria-live="polite">
+                <span>Next game drops in</span>
+                <strong>{countdownLabel(nextGameIn)}</strong>
+                <small>Midnight New York time</small>
+              </div>
+            )}
+            {!isArchive && latestPastDate && (
+              <div className="archive-entry">
+                <span>Missed yesterday?</span>
+                <a href={`/game/${latestPastDate}`}>Play {displayDate(latestPastDate)}</a>
+                <button type="button" onClick={() => setArchiveOpen((open) => !open)} aria-expanded={archiveOpen}>Past games</button>
+              </div>
+            )}
+            {archiveOpen && (
+              <div className="archive-list" aria-label="Past games">
+                {pastDates.slice().reverse().map((date) => {
+                  const index = scheduleDates.indexOf(date) + 1;
+                  const score = archiveScores[date];
+                  return <a href={`/game/${date}`} key={date}><span><strong>{displayDate(date)}</strong><small>No. {index}</small></span><i>{score === null || score === undefined ? "Play" : `✓ ${score}/500`}</i></a>;
+                })}
+              </div>
+            )}
             <div className="share-preview-wrap">
               <span>Share preview</span>
               <pre>{shareText}</pre>
