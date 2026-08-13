@@ -514,7 +514,7 @@ export function NycMap() {
   const currentDate = Date.parse(`${gameDate}T00:00:00Z`);
   const gameNumber = Math.max(1, Math.floor((currentDate - startDate) / 86_400_000) + 1);
   const gameDateLabel = displayDate(gameDate);
-  const shareDate = displayDate(gameDate);
+  const shareDate = displayDate(gameDate).replace(/^([A-Za-z]{3})[a-z]+/, "$1");
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
   const shareText = `www.notatransplant.nyc ${shareDate}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
 
