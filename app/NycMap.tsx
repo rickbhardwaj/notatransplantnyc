@@ -14,6 +14,9 @@ type BoundaryFeature = Feature<Polygon | MultiPolygon, BoundaryProperties>;
 type BoundaryCollection = FeatureCollection<Polygon | MultiPolygon, BoundaryProperties>;
 type OverlayPaths = { neighborhood: string; width: number; height: number };
 type WikipediaPreview = { title: string; extract: string; image: string; url: string };
+type GamePhase = "guess" | "reveal" | "finished";
+type SavedResult = Omit<Result, "landmark" | "neighborhood"> & { landmarkId: string };
+type SavedProgress = { version: 1; date: string; round: number; phase: GamePhase; results: SavedResult[] };
 
 type Result = {
   landmark: Landmark;
@@ -30,6 +33,7 @@ type Result = {
 const NYC_BOUNDS: LngLatBoundsLike = [[-74.29, 40.48], [-73.66, 40.94]];
 const NAVIGATION_BOUNDS: LngLatBoundsLike = [[-74.55, 40.25], [-73.35, 41.25]];
 const HOLD_DURATION = 1150;
+const PROGRESS_KEY_PREFIX = "not-a-transplant:daily-progress:";
 
 const CARTO_STYLE: maplibregl.StyleSpecification = {
   version: 8,
@@ -131,6 +135,46 @@ function placesForSchedule(dateKey: string) {
   const landmarks = new Map(LANDMARKS.map((landmark) => [landmark.id, landmark]));
   const places = scheduledIds.map((id) => landmarks.get(id));
   return places.every((place): place is Landmark => Boolean(place)) ? places : null;
+}
+
+function savedProgressFor(dateKey: string, places: Landmark[]): SavedProgress | null {
+  try {
+    const raw = window.localStorage.getItem(`${PROGRESS_KEY_PREFIX}${dateKey}`);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<SavedProgress>;
+    if (saved.version !== 1 || saved.date !== dateKey || !Array.isArray(saved.results)) return null;
+    if (saved.results.length > 5 || saved.results.some((result, index) => result.landmarkId !== places[index]?.id)) return null;
+    const complete = saved.results.length === 5;
+    const phase: GamePhase = complete ? "finished" : saved.phase === "reveal" ? "reveal" : "guess";
+    const round = complete ? 4 : phase === "reveal" ? saved.results.length - 1 : saved.results.length;
+    if (round < 0 || round > 4) return null;
+    return { version: 1, date: dateKey, round, phase, results: saved.results };
+  } catch {
+    return null;
+  }
+}
+
+function saveProgress(dateKey: string, round: number, phase: GamePhase, results: Result[]) {
+  const saved: SavedProgress = {
+    version: 1,
+    date: dateKey,
+    round,
+    phase,
+    results: results.map(({ landmark, neighborhood: _neighborhood, ...result }) => ({ ...result, landmarkId: landmark.id })),
+  };
+  try {
+    window.localStorage.setItem(`${PROGRESS_KEY_PREFIX}${dateKey}`, JSON.stringify(saved));
+  } catch {
+    // Storage can be unavailable in private or restricted browser contexts.
+  }
+}
+
+function restoreResults(saved: SavedProgress, places: Landmark[]): Result[] {
+  return saved.results.map(({ landmarkId, ...result }) => ({
+    ...result,
+    landmark: places.find((place) => place.id === landmarkId)!,
+    neighborhood: null,
+  }));
 }
 
 function distanceKm(a: [number, number], b: [number, number]) {
@@ -257,7 +301,7 @@ export function NycMap() {
   const [places, setPlaces] = useState<Landmark[]>([]);
   const [round, setRound] = useState(0);
   const [results, setResults] = useState<Result[]>([]);
-  const [phase, setPhase] = useState<"guess" | "reveal" | "finished">("guess");
+  const [phase, setPhase] = useState<GamePhase>("guess");
   const [ready, setReady] = useState(false);
   const [boundaries, setBoundaries] = useState<BoundaryCollection | null>(null);
   const [holdPoint, setHoldPoint] = useState<{ x: number; y: number } | null>(null);
@@ -276,7 +320,14 @@ export function NycMap() {
   useEffect(() => {
     const controller = new AbortController();
     const dateKey = gameDate;
-    setPlaces(placesForSchedule(dateKey) ?? dailyFive(seededRandom(dateKey)));
+    const dailyPlaces = placesForSchedule(dateKey) ?? dailyFive(seededRandom(dateKey));
+    setPlaces(dailyPlaces);
+    const saved = savedProgressFor(dateKey, dailyPlaces);
+    if (saved) {
+      setResults(restoreResults(saved, dailyPlaces));
+      setRound(saved.round);
+      setPhase(saved.phase);
+    }
     fetch("/data/nyc-neighborhoods.json", { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error("Neighborhood boundaries failed to load");
@@ -374,6 +425,19 @@ export function NycMap() {
     map.fitBounds(bounds, { padding: { top: 150, right: 55, bottom: 230, left: 55 }, maxZoom: 13.5, duration: 950 });
   }, [clearReveal, refreshOverlay]);
 
+  useEffect(() => {
+    const restoredResult = phase === "reveal" ? results.at(-1) : null;
+    if (!ready || !boundaries || !restoredResult || revealResultRef.current) return;
+    const neighborhood = findBoundary(boundaries, restoredResult.landmark.coordinates);
+    const hydratedResult = {
+      ...restoredResult,
+      neighborhood,
+      neighborhoodName: neighborhood?.properties.name ?? restoredResult.neighborhoodName,
+    };
+    setResults((current) => [...current.slice(0, -1), hydratedResult]);
+    showReveal(hydratedResult);
+  }, [boundaries, phase, ready, results, showReveal]);
+
   const commitGuess = useCallback((point: { x: number; y: number }) => {
     const map = mapRef.current;
     const landmark = places[round];
@@ -401,10 +465,12 @@ export function NycMap() {
     };
     clearHold();
     navigator.vibrate?.([45, 30, 110]);
-    setResults((current) => [...current, result]);
+    const nextResults = [...results, result];
+    setResults(nextResults);
     setPhase("reveal");
+    saveProgress(gameDate, round, "reveal", nextResults);
     showReveal(result);
-  }, [boundaries, clearHold, phase, places, round, showReveal]);
+  }, [boundaries, clearHold, gameDate, phase, places, results, round, showReveal]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -499,10 +565,13 @@ export function NycMap() {
     clearReveal();
     if (round === 4) {
       setPhase("finished");
+      saveProgress(gameDate, round, "finished", results);
       return;
     }
-    setRound((value) => value + 1);
+    const nextRoundNumber = round + 1;
+    setRound(nextRoundNumber);
     setPhase("guess");
+    saveProgress(gameDate, nextRoundNumber, "guess", results);
     mapRef.current?.fitBounds(NYC_BOUNDS, { padding: 30, duration: 850 });
   };
 
