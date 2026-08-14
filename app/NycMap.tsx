@@ -64,10 +64,17 @@ function randomFrom<T>(items: T[], count: number, random = Math.random) {
 }
 
 function dailyFive(random = Math.random) {
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 2, random);
-  const medium = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 2, random);
-  const hard = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random);
-  return [...easy, ...medium, ...hard];
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 3, random);
+  const finalQuestionIsHard = random() < 0.5;
+  const medium = randomFrom(
+    LANDMARKS.filter((landmark) => landmark.difficulty === "medium"),
+    finalQuestionIsHard ? 1 : 2,
+    random,
+  );
+  const finalQuestion = finalQuestionIsHard
+    ? randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random)
+    : medium.slice(1);
+  return [...easy, medium[0], ...finalQuestion];
 }
 
 function difficultyLabel(difficulty: Difficulty) {
