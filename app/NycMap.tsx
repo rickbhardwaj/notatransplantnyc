@@ -64,17 +64,12 @@ function randomFrom<T>(items: T[], count: number, random = Math.random) {
 }
 
 function dailyFive(random = Math.random) {
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 3, random);
+  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 4, random);
   const finalQuestionIsHard = random() < 0.5;
-  const medium = randomFrom(
-    LANDMARKS.filter((landmark) => landmark.difficulty === "medium"),
-    finalQuestionIsHard ? 1 : 2,
-    random,
-  );
   const finalQuestion = finalQuestionIsHard
     ? randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random)
-    : medium.slice(1);
-  return [...easy, medium[0], ...finalQuestion];
+    : randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "medium"), 1, random);
+  return [...easy, ...finalQuestion];
 }
 
 function difficultyLabel(difficulty: Difficulty) {
@@ -616,6 +611,9 @@ export function NycMap({ requestedDate }: NycMapProps = {}) {
   };
 
   const currentResult = results.at(-1);
+  const neighborhoodHint = places[round] && boundaries
+    ? findBoundary(boundaries, places[round].coordinates)?.properties.name
+    : null;
   const totalScore = results.reduce((sum, result) => sum + result.score, 0);
   const verdict = totalScore >= 250 ? "Not a Transplant" : "Transplant";
   const scheduleDates = Object.keys(DAILY_GAMES).sort();
@@ -706,6 +704,7 @@ export function NycMap({ requestedDate }: NycMapProps = {}) {
           </span>
           <span className="eyebrow">Find this place</span>
           <h1>{places[round].name}</h1>
+          {neighborhoodHint && <div className="neighborhood-subtitle">{neighborhoodHint}</div>}
           <p>Press and hold your guess</p>
         </section>
       )}

@@ -245,6 +245,13 @@ button {
   text-transform: uppercase;
 }
 
+.neighborhood-subtitle {
+  margin: 0 0 5px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .challenge-card p {
   margin: 0;
   color: #567084;
@@ -683,18 +690,6 @@ button {
   text-transform: uppercase;
 }
 
-.verdict::before {
-  position: absolute;
-  z-index: -1;
-  right: 23%;
-  bottom: -10px;
-  left: 23%;
-  height: 15px;
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  background: var(--orange);
-  content: "";
-}
-
 .verdict small {
   color: var(--orange);
   font-family: Arial, Helvetica, sans-serif;
@@ -726,7 +721,6 @@ button {
   box-shadow: 0 0 0 3px var(--blue), 4px 6px 0 var(--navy);
 }
 
-.verdict-transplant::before { background: var(--blue); }
 .verdict-transplant strong { text-shadow: 2px 2px 0 var(--blue), 3px 3px 0 var(--navy); }
 
 .share-preview-wrap {
