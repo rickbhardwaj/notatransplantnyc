@@ -16,16 +16,13 @@ type OverlayPaths = { neighborhood: string; width: number; height: number };
 type WikipediaPreview = { title: string; extract: string; image: string; url: string };
 type GamePhase = "guess" | "reveal" | "finished";
 type SavedResult = Omit<Result, "landmark" | "neighborhood"> & { landmarkId: string };
-type SavedProgress = { version: 1; date: string; round: number; phase: GamePhase; results: SavedResult[] };
+type SavedProgress = { version: 1 | 2; date: string; round: number; phase: GamePhase; results: SavedResult[] };
 type NycMapProps = { requestedDate?: string };
 
 type Result = {
   landmark: Landmark;
   guess: [number, number];
   distanceKm: number;
-  distanceScore: number;
-  boroughBonus: number;
-  neighborhoodBonus: number;
   neighborhoodName: string;
   neighborhood: BoundaryFeature | null;
   score: number;
@@ -145,13 +142,13 @@ function savedProgressFor(dateKey: string, places: Landmark[]): SavedProgress | 
     const raw = window.localStorage.getItem(`${PROGRESS_KEY_PREFIX}${dateKey}`);
     if (!raw) return null;
     const saved = JSON.parse(raw) as Partial<SavedProgress>;
-    if (saved.version !== 1 || saved.date !== dateKey || !Array.isArray(saved.results)) return null;
+    if ((saved.version !== 1 && saved.version !== 2) || saved.date !== dateKey || !Array.isArray(saved.results)) return null;
     if (saved.results.length > 5 || saved.results.some((result, index) => result.landmarkId !== places[index]?.id)) return null;
     const complete = saved.results.length === 5;
     const phase: GamePhase = complete ? "finished" : saved.phase === "reveal" ? "reveal" : "guess";
     const round = complete ? 4 : phase === "reveal" ? saved.results.length - 1 : saved.results.length;
     if (round < 0 || round > 4) return null;
-    return { version: 1, date: dateKey, round, phase, results: saved.results };
+    return { version: saved.version, date: dateKey, round, phase, results: saved.results };
   } catch {
     return null;
   }
@@ -159,7 +156,7 @@ function savedProgressFor(dateKey: string, places: Landmark[]): SavedProgress | 
 
 function saveProgress(dateKey: string, round: number, phase: GamePhase, results: Result[]) {
   const saved: SavedProgress = {
-    version: 1,
+    version: 2,
     date: dateKey,
     round,
     phase,
@@ -175,6 +172,7 @@ function saveProgress(dateKey: string, round: number, phase: GamePhase, results:
 function restoreResults(saved: SavedProgress, places: Landmark[]): Result[] {
   return saved.results.map(({ landmarkId, ...result }) => ({
     ...result,
+    score: scoreFor(result.distanceKm),
     landmark: places.find((place) => place.id === landmarkId)!,
     neighborhood: null,
   }));
@@ -185,8 +183,8 @@ function savedScoreFor(dateKey: string) {
     const raw = window.localStorage.getItem(`${PROGRESS_KEY_PREFIX}${dateKey}`);
     if (!raw) return null;
     const saved = JSON.parse(raw) as Partial<SavedProgress>;
-    if (saved.version !== 1 || saved.date !== dateKey || saved.results?.length !== 5) return null;
-    return saved.results.reduce((sum, result) => sum + (typeof result.score === "number" ? result.score : 0), 0);
+    if ((saved.version !== 1 && saved.version !== 2) || saved.date !== dateKey || saved.results?.length !== 5) return null;
+    return saved.results.reduce((sum, result) => sum + (typeof result.distanceKm === "number" ? scoreFor(result.distanceKm) : 0), 0);
   } catch {
     return null;
   }
@@ -202,12 +200,9 @@ function distanceKm(a: [number, number], b: [number, number]) {
   return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-function scoreFor(distance: number, boroughBonus: number, neighborhoodBonus: number) {
-  const distanceScore = Math.round(70 * Math.exp(-distance / 4));
-  return {
-    distanceScore,
-    score: Math.min(100, distanceScore + boroughBonus + neighborhoodBonus),
-  };
+function scoreFor(distance: number) {
+  const score = Math.round(100 * Math.exp(-distance / 4));
+  return score >= 90 ? 100 : score;
 }
 
 function pointInRing(point: [number, number], ring: Position[]) {
@@ -483,20 +478,13 @@ export function NycMap({ requestedDate }: NycMapProps = {}) {
     const guess: [number, number] = [lngLat.lng, lngLat.lat];
     const kilometers = distanceKm(guess, landmark.coordinates);
     const correctBoundary = findBoundary(boundaries, landmark.coordinates);
-    const guessedBoundary = findBoundary(boundaries, guess);
-    const boroughBonus = correctBoundary && guessedBoundary?.properties.borough === correctBoundary.properties.borough ? 10 : 0;
-    const neighborhoodBonus = correctBoundary && guessedBoundary?.properties.id === correctBoundary.properties.id ? 20 : 0;
-    const scoring = scoreFor(kilometers, boroughBonus, neighborhoodBonus);
     const result: Result = {
       landmark,
       guess,
       distanceKm: kilometers,
-      distanceScore: scoring.distanceScore,
-      boroughBonus,
-      neighborhoodBonus,
       neighborhoodName: correctBoundary?.properties.name ?? "Landmark area",
       neighborhood: correctBoundary,
-      score: scoring.score,
+      score: scoreFor(kilometers),
     };
     clearHold();
     navigator.vibrate?.([45, 30, 110]);
@@ -725,10 +713,6 @@ export function NycMap({ requestedDate }: NycMapProps = {}) {
               <span>{currentResult.landmark.name}</span>
               <strong>{currentResult.distanceKm < 1 ? `${Math.round(currentResult.distanceKm * 1000)} m away` : `${currentResult.distanceKm.toFixed(1)} km away`}</strong>
               <em className="neighborhood-name">{currentResult.neighborhoodName}</em>
-              <div className="bonus-row" aria-label={`Scoring bonuses for ${currentResult.neighborhoodName}`}>
-                <span className={currentResult.neighborhoodBonus ? "bonus-earned" : "bonus-missed"}>+20 Neighborhood</span>
-                <span className={currentResult.boroughBonus ? "bonus-earned" : "bonus-missed"}>+10 Borough</span>
-              </div>
             </div>
             <button type="button" onClick={nextRound}>{round === 4 ? "See results" : "Next place"}</button>
           </div>
