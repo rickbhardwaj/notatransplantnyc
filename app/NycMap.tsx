@@ -61,7 +61,11 @@ function randomFrom<T>(items: T[], count: number, random = Math.random) {
 }
 
 function dailyFive(random = Math.random) {
-  const easy = randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "easy"), 4, random);
+  const easy = randomFrom(
+    LANDMARKS.filter((landmark) => landmark.difficulty === "easy" && landmark.borough !== "Staten Island"),
+    4,
+    random,
+  );
   const finalQuestionIsHard = random() < 0.5;
   const finalQuestion = finalQuestionIsHard
     ? randomFrom(LANDMARKS.filter((landmark) => landmark.difficulty === "hard"), 1, random)
