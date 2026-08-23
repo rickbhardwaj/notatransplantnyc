@@ -616,7 +616,7 @@ export function NycMap({ requestedDate }: NycMapProps = {}) {
   const gameDateLabel = displayDate(gameDate);
   const shareDate = displayDate(gameDate).replace(/^([A-Za-z]{3})[a-z]+/, "$1");
   const shareScoreLine = results.map((result) => `${result.score}${scoreEmoji(result.score)}`).join(" ");
-  const shareText = `www.notatransplant.nyc ${shareDate} #${gameNumber}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
+  const shareText = `www.notatransplant.nyc ${shareDate} ${gameNumber}\n${shareScoreLine}\nFinal score: ${totalScore}/500\nVerdict: ${verdict}`;
   const pastDates = scheduleDates.filter((date) => date < todayDate);
   const latestPastDate = pastDates.at(-1);
   const archiveIndex = pastDates.indexOf(gameDate);
